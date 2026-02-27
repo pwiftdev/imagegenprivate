@@ -188,7 +188,7 @@ function App() {
     setControlPanelOpen(true);
   }, []);
 
-  const handleCopyPrompt = useCallback((prompt: string) => {
+  const handleCopyPrompt = useCallback((_prompt: string) => {
     setCopiedFeedback(true);
     setTimeout(() => setCopiedFeedback(false), 2000);
   }, []);

@@ -80,42 +80,72 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     };
   }, []);
 
+  const addImagesFromFiles = useCallback(async (files: File[]) => {
+    const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (validFiles.length === 0) return;
+    const newUrls = validFiles.map(f => URL.createObjectURL(f));
+    objectUrlsRef.current.push(...newUrls);
+    setReferenceImages(prev => [...prev, ...newUrls]);
+    try {
+      const base64Images = await Promise.all(validFiles.map(f => compressImageForReference(f)));
+      setReferenceImagesBase64(prev => [...prev, ...base64Images]);
+    } catch (err) {
+      console.error('Failed to compress images:', err);
+    }
+  }, []);
+
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const filesArray = Array.from(files);
-      
-      // Create object URLs for display
-      const newImages = filesArray.map(file => URL.createObjectURL(file));
-      objectUrlsRef.current.push(...newImages);
-      setReferenceImages(prev => [...prev, ...newImages]);
-      
-      // Compress and convert to base64 (stays under Vercel's 4.5MB limit)
-      try {
-        const base64Images = await Promise.all(filesArray.map(file => compressImageForReference(file)));
-        setReferenceImagesBase64(prev => [...prev, ...base64Images]);
-      } catch (error) {
-        console.error('Failed to convert images to base64:', error);
-      }
+      await addImagesFromFiles(Array.from(files));
+      e.target.value = '';
     }
-    // Reset input to allow selecting the same file again
-    e.target.value = '';
-  }, []);
+  }, [addImagesFromFiles]);
 
   const removeReferenceImage = useCallback((index: number) => {
     setReferenceImages(prev => {
       const urlToRemove = prev[index];
-      // Clean up object URL
-      if (urlToRemove && urlToRemove.startsWith('blob:')) {
+      if (urlToRemove?.startsWith('blob:')) {
         URL.revokeObjectURL(urlToRemove);
         objectUrlsRef.current = objectUrlsRef.current.filter(url => url !== urlToRemove);
       }
       return prev.filter((_, i) => i !== index);
     });
-    
-    // Also remove from base64 array
     setReferenceImagesBase64(prev => prev.filter((_, i) => i !== index));
   }, []);
+
+  const reorderReferenceImages = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setReferenceImages(prev => {
+      const next = [...prev];
+      const [removed] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, removed);
+      return next;
+    });
+    setReferenceImagesBase64(prev => {
+      const next = [...prev];
+      const [removed] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, removed);
+      return next;
+    });
+  }, []);
+
+  // Paste from clipboard (Ctrl+V / Cmd+V) - skip when typing in prompt
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const target = document.activeElement as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'));
+      if (imageItems.length === 0) return;
+      e.preventDefault();
+      const files = imageItems.map(item => item.getAsFile()).filter((f): f is File => f != null);
+      if (files.length > 0) addImagesFromFiles(files);
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [addImagesFromFiles]);
 
   const handleGenerateClick = useCallback(() => {
     if (!onGenerate) return;
@@ -169,13 +199,43 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="relative z-10 p-6">
             {/* Reference Images Grid */}
             <div className="mb-2 py-1">
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+              <div
+                className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide"
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = e.dataTransfer.files;
+                  if (files.length > 0) addImagesFromFiles(Array.from(files));
+                }}
+              >
                 {referenceImages.map((img, index) => (
-                  <div key={`ref-${index}-${img.slice(0, 20)}`} className="relative flex-shrink-0">
+                  <div
+                    key={`ref-${index}-${img.slice(0, 20)}`}
+                    draggable
+                    className="relative flex-shrink-0 cursor-grab active:cursor-grabbing"
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', String(index));
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const files = e.dataTransfer.files;
+                      if (files.length > 0) {
+                        addImagesFromFiles(Array.from(files));
+                      } else {
+                        const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        if (!Number.isNaN(from) && from !== index) reorderReferenceImages(from, index);
+                      }
+                    }}
+                  >
                     <img
                       src={img}
                       alt={`Reference ${index + 1}`}
-                      className="w-14 h-14 object-cover rounded-lg border border-white/20 backdrop-blur-sm bg-white/5"
+                      className="w-14 h-14 object-cover rounded-lg border border-white/20 backdrop-blur-sm bg-white/5 pointer-events-none"
                     />
                     <button
                       onClick={() => removeReferenceImage(index)}
@@ -198,6 +258,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   </svg>
                 </label>
               </div>
+              <p className="text-white/40 text-xs mt-1">Drag to reorder · Ctrl/Cmd+V to paste from clipboard</p>
             </div>
 
             {/* Prompt Input */}
