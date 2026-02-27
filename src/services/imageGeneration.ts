@@ -22,67 +22,87 @@ export interface GeneratedImage {
   imageSize: string;
 }
 
-/**
- * Generate one image via our API proxy (key stays on server)
- */
-export async function generateImage(params: ImageGenerationParams): Promise<GeneratedImage> {
-  const url = `${API_BASE}/api/generate`;
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt: params.prompt,
-      aspectRatio: params.aspectRatio,
-      imageSize: params.imageSize,
-      referenceImages: params.referenceImages,
-    }),
-  });
+const MAX_RETRIES = 3;
 
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.error || `Generation failed: ${response.status}`);
-  }
-
-  const { base64Data, prompt, aspectRatio, imageSize } = data;
-  if (!base64Data) {
-    throw new Error('No image data returned');
-  }
-
-  const dataUrl = `data:image/png;base64,${base64Data}`;
-
-  return {
-    id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    url: dataUrl,
-    base64Data,
-    timestamp: Date.now(),
-    prompt: prompt || params.prompt,
-    aspectRatio: aspectRatio || params.aspectRatio,
-    imageSize: imageSize || params.imageSize,
-  };
+async function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /**
- * Generate multiple images in batch
+ * Generate one image via our API proxy (key stays on server)
+ * Retries on 429/503 with exponential backoff
+ */
+export async function generateImage(params: ImageGenerationParams): Promise<GeneratedImage> {
+  const url = `${API_BASE}/api/generate`;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: params.prompt,
+        aspectRatio: params.aspectRatio,
+        imageSize: params.imageSize,
+        referenceImages: params.referenceImages,
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      const { base64Data, prompt, aspectRatio, imageSize } = data;
+      if (!base64Data) {
+        throw new Error('No image data returned');
+      }
+      const dataUrl = `data:image/png;base64,${base64Data}`;
+      return {
+        id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        url: dataUrl,
+        base64Data,
+        timestamp: Date.now(),
+        prompt: prompt || params.prompt,
+        aspectRatio: aspectRatio || params.aspectRatio,
+        imageSize: imageSize || params.imageSize,
+      };
+    }
+
+    lastError = new Error(data.error || `Generation failed: ${response.status}`);
+    const retryable = response.status === 429 || response.status === 503;
+    if (!retryable || attempt === MAX_RETRIES - 1) throw lastError;
+
+    const backoffMs = 1000 * Math.pow(2, attempt);
+    await sleep(backoffMs);
+  }
+
+  throw lastError ?? new Error('Generation failed');
+}
+
+const DELAY_MS = 2000; // Pause between requests to avoid 429 rate limits
+
+/**
+ * Generate multiple images in batch (sequentially to avoid API rate limits)
  */
 export async function generateBatchImages(
   params: ImageGenerationParams,
   count: number
 ): Promise<GeneratedImage[]> {
-  const promises = Array.from({ length: count }, () => generateImage(params));
+  const results: GeneratedImage[] = [];
 
-  try {
-    return await Promise.all(promises);
-  } catch (error) {
-    const results = await Promise.allSettled(promises);
-    const successfulImages = results
-      .filter((r): r is PromiseFulfilledResult<GeneratedImage> => r.status === 'fulfilled')
-      .map((r) => r.value);
-
-    if (successfulImages.length === 0) throw error;
-    return successfulImages;
+  for (let i = 0; i < count; i++) {
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, DELAY_MS));
+    }
+    try {
+      const img = await generateImage(params);
+      results.push(img);
+    } catch (error) {
+      if (results.length === 0) throw error;
+      return results; // Return partial results
+    }
   }
+
+  return results;
 }
 
 /**
