@@ -6,28 +6,25 @@ interface ImageModalProps {
   aspectRatio?: string;
   imageSize?: string;
   onClose: () => void;
+  onReusePrompt?: (prompt: string) => void;
 }
 
-const ImageModal: React.FC<ImageModalProps> = ({ 
-  imageUrl, 
-  prompt, 
-  aspectRatio, 
-  imageSize, 
-  onClose 
+const ImageModal: React.FC<ImageModalProps> = ({
+  imageUrl,
+  prompt,
+  aspectRatio,
+  imageSize,
+  onClose,
+  onReusePrompt,
 }) => {
-  // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
-    
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
-  // Prevent body scroll when modal is open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -54,14 +51,11 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
   const handleCopyToClipboard = useCallback(async () => {
     try {
-      // Convert base64 to blob
       const response = await fetch(imageUrl);
       const blob = await response.blob();
-      
       await navigator.clipboard.write([
-        new ClipboardItem({ [blob.type]: blob })
+        new ClipboardItem({ [blob.type]: blob }),
       ]);
-      
       alert('Image copied to clipboard!');
     } catch (error) {
       console.error('Failed to copy image:', error);
@@ -74,12 +68,13 @@ const ImageModal: React.FC<ImageModalProps> = ({
       try {
         const response = await fetch(imageUrl);
         const blob = await response.blob();
-        const file = new File([blob], 'generated-image.png', { type: 'image/png' });
-        
+        const file = new File([blob], 'generated-image.png', {
+          type: 'image/png',
+        });
         await navigator.share({
           files: [file],
           title: 'Generated Image',
-          text: prompt || 'Check out this AI-generated image!'
+          text: prompt || 'Check out this AI-generated image!',
         });
       } catch (error) {
         console.error('Failed to share:', error);
@@ -89,102 +84,186 @@ const ImageModal: React.FC<ImageModalProps> = ({
     }
   }, [imageUrl, prompt]);
 
-  const isShareSupported = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const handleReusePrompt = useCallback(() => {
+    if (prompt?.trim() && onReusePrompt) {
+      onReusePrompt(prompt.trim());
+      onClose();
+    }
+  }, [prompt, onReusePrompt, onClose]);
+
+  const isShareSupported =
+    typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   return (
-    <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
       onClick={onClose}
     >
-      {/* Modal Content */}
-      <div 
-        className="relative max-w-7xl max-h-[90vh] w-full mx-4 flex flex-col"
+      <div
+        className="relative flex max-w-5xl w-full max-h-[90vh] bg-black/60 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close Button */}
+        {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute -top-12 right-0 text-white/80 hover:text-white transition-colors"
+          className="absolute top-4 right-4 z-20 text-white/80 hover:text-white transition-colors p-1"
           aria-label="Close"
         >
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
 
-        {/* Image Container */}
-        <div className="relative flex items-center justify-center bg-black/50 rounded-2xl overflow-hidden">
+        {/* Left: Image */}
+        <div className="flex-1 flex items-center justify-center min-w-0 p-6">
           <img
             src={imageUrl}
             alt="Generated image"
-            className="max-w-full max-h-[70vh] object-contain"
+            className="max-w-full max-h-[80vh] object-contain rounded-xl"
           />
         </div>
 
-        {/* Action Bar */}
-        <div className="mt-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            {/* Image Info */}
-            <div className="flex-1 min-w-[200px]">
-              {prompt && (
-                <p className="text-white/80 text-sm mb-1 line-clamp-2">
-                  <span className="text-white/60">Prompt:</span> {prompt}
-                </p>
-              )}
-              <div className="flex gap-3 text-xs text-white/60">
-                {aspectRatio && <span>Ratio: {aspectRatio}</span>}
-                {imageSize && <span>Quality: {imageSize}</span>}
-              </div>
+        {/* Right: Info panel */}
+        <div className="w-80 flex-shrink-0 flex flex-col border-l border-white/10">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Branding */}
+            <div>
+              <img
+                src="/kreatorlogo.png"
+                alt="Kreator"
+                className="h-8 w-auto rounded-lg mb-2"
+              />
+              <p className="text-white/50 text-xs italic">By Kreator, for creators.</p>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2">
-              {/* Download */}
-              <button
-                onClick={handleDownload}
-                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm"
-                title="Download image"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Download
-              </button>
+            {/* Prompt */}
+            {prompt && (
+              <div>
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1">
+                  Prompt
+                </p>
+                <p className="text-white/90 text-sm leading-relaxed">{prompt}</p>
+              </div>
+            )}
 
-              {/* Copy */}
-              <button
-                onClick={handleCopyToClipboard}
-                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm"
-                title="Copy to clipboard"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Copy
-              </button>
-
-              {/* Share (if supported) */}
-              {isShareSupported && (
-                <button
-                  onClick={handleShare}
-                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm"
-                  title="Share image"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  Share
-                </button>
+            {/* Meta */}
+            <div className="flex gap-4 text-sm">
+              {aspectRatio && (
+                <div>
+                  <p className="text-white/50 text-xs mb-0.5">Ratio</p>
+                  <p className="text-white font-medium">{aspectRatio}</p>
+                </div>
+              )}
+              {imageSize && (
+                <div>
+                  <p className="text-white/50 text-xs mb-0.5">Quality</p>
+                  <p className="text-white font-medium">{imageSize}</p>
+                </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Keyboard Hint */}
-        <p className="text-center text-white/40 text-xs mt-3">
-          Press <kbd className="px-2 py-1 bg-white/10 rounded">ESC</kbd> to close
-        </p>
+          {/* Actions */}
+          <div className="p-4 border-t border-white/10 space-y-2">
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownload}
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                Download
+              </button>
+              <button
+                onClick={handleCopyToClipboard}
+                className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+                Copy
+              </button>
+            </div>
+            {isShareSupported && (
+              <button
+                onClick={handleShare}
+                className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                  />
+                </svg>
+                Share
+              </button>
+            )}
+            {prompt?.trim() && onReusePrompt && (
+              <button
+                onClick={handleReusePrompt}
+                className="w-full flex items-center justify-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 py-2.5 rounded-xl text-sm font-medium transition-all"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Reuse prompt
+              </button>
+            )}
+          </div>
+        </div>
       </div>
+
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs">
+        Press <kbd className="px-2 py-0.5 bg-white/10 rounded">ESC</kbd> to close
+      </p>
     </div>
   );
 };

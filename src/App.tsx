@@ -36,6 +36,7 @@ function App() {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [qualityFilter, setQualityFilter] = useState<'All' | '1K' | '2K' | '4K'>('All');
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
+  const [promptToInject, setPromptToInject] = useState<string | null>(null);
 
   // Load images from Supabase (refetch when viewMode changes)
   useEffect(() => {
@@ -44,16 +45,18 @@ function App() {
       setIsLoading(true);
       try {
         const stored = await fetchImagesFromSupabase(viewMode);
-        setGridItems(
-          stored.map((img) => ({
-            type: 'image' as const,
-            id: img.id,
-            url: img.url,
-            aspectRatio: img.aspect_ratio || '',
-            prompt: img.prompt || '',
-            imageSize: img.image_size || ''
-          }))
-        );
+        const newImages: GridItem[] = stored.map((img) => ({
+          type: 'image' as const,
+          id: img.id,
+          url: img.url,
+          aspectRatio: img.aspect_ratio || '',
+          prompt: img.prompt || '',
+          imageSize: img.image_size || ''
+        }));
+        setGridItems((prev) => {
+          const placeholders = prev.filter((item): item is Extract<GridItem, { type: 'placeholder' }> => item.type === 'placeholder');
+          return [...placeholders, ...newImages];
+        });
       } catch (err) {
         console.error('Failed to load images:', err);
         const msg = err instanceof Error ? err.message : 'Failed to load images';
@@ -169,6 +172,10 @@ function App() {
 
   const handleCloseModal = useCallback(() => {
     setSelectedImageIndex(null);
+  }, []);
+
+  const handlePromptInjected = useCallback(() => {
+    setPromptToInject(null);
   }, []);
 
   if (authLoading) {
@@ -291,7 +298,12 @@ function App() {
       </div>
 
       {/* Control Panel - Overlapping at bottom with liquid glass effect */}
-      <ControlPanel onGenerate={handleGenerate} isGenerating={isProcessing} />
+      <ControlPanel
+        onGenerate={handleGenerate}
+        isGenerating={isProcessing}
+        promptToInject={promptToInject}
+        onPromptInjected={handlePromptInjected}
+      />
 
       {/* Image Modal */}
       {selectedImageIndex !== null && (() => {
@@ -307,6 +319,7 @@ function App() {
             aspectRatio={item.aspectRatio}
             imageSize={item.imageSize}
             onClose={handleCloseModal}
+            onReusePrompt={setPromptToInject}
           />
         );
       })()}
