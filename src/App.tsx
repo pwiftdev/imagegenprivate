@@ -10,19 +10,26 @@ import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import './App.css';
 
-// Normalized image shape for display (works for both generated and stored)
-interface DisplayImage {
+type GridItem =
+  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string }
+  | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string };
+
+interface QueuedBatch {
   id: string;
-  url: string;
-  prompt: string;
-  aspectRatio: string;
-  imageSize: string;
+  params: ImageGenerationParams;
+  batchSize: number;
+}
+
+let batchIdCounter = 0;
+function nextBatchId() {
+  return `batch-${++batchIdCounter}`;
 }
 
 function App() {
-  const [images, setImages] = useState<DisplayImage[]>([]);
+  const [gridItems, setGridItems] = useState<GridItem[]>([]);
+  const [queue, setQueue] = useState<QueuedBatch[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [showStatistics, setShowStatistics] = useState(false);
@@ -32,12 +39,13 @@ function App() {
     async function load() {
       try {
         const stored = await fetchImagesFromSupabase();
-        setImages(
+        setGridItems(
           stored.map((img) => ({
+            type: 'image' as const,
             id: img.id,
             url: img.url,
-            prompt: img.prompt || '',
             aspectRatio: img.aspect_ratio || '',
+            prompt: img.prompt || '',
             imageSize: img.image_size || ''
           }))
         );
@@ -56,20 +64,26 @@ function App() {
     load();
   }, []);
 
-  const handleGenerate = useCallback(async (params: ImageGenerationParams, batchSize: number) => {
-    if (!params.prompt.trim()) {
-      setError('Please enter a prompt');
-      return;
-    }
+  const processBatch = useCallback(async (batch: QueuedBatch) => {
+    if (isProcessing) return;
 
-    setIsGenerating(true);
-    setError(null);
+    setIsProcessing(true);
+    setQueue((q) => q.filter((b) => b.id !== batch.id));
+
+    const placeholderIds = Array.from({ length: batch.batchSize }, (_, i) => `ph-${batch.id}-${i}`);
+
+    setGridItems((prev) =>
+      prev.map((item) =>
+        item.type === 'placeholder' && placeholderIds.includes(item.id)
+          ? { ...item, status: 'generating' as const }
+          : item
+      )
+    );
 
     try {
-      const newImages = await generateBatchImages(params, batchSize);
+      const newImages = await generateBatchImages(batch.params, batch.batchSize);
+      const saved: GridItem[] = [];
 
-      // Save each to Supabase and add to state
-      const saved: DisplayImage[] = [];
       for (const img of newImages) {
         try {
           const stored = await saveImageToSupabase(
@@ -79,36 +93,74 @@ function App() {
             img.imageSize
           );
           saved.push({
+            type: 'image',
             id: stored.id,
             url: stored.url,
-            prompt: stored.prompt || img.prompt,
             aspectRatio: stored.aspect_ratio || img.aspectRatio,
+            prompt: stored.prompt || img.prompt,
             imageSize: stored.image_size || img.imageSize
           });
         } catch (saveErr) {
           console.error('Failed to save image to Supabase:', saveErr);
-          // Fallback: show locally even if save failed
           saved.push({
+            type: 'image',
             id: img.id,
             url: img.url,
-            prompt: img.prompt,
             aspectRatio: img.aspectRatio,
+            prompt: img.prompt,
             imageSize: img.imageSize
           });
         }
       }
 
-      setImages((prev) => [...saved, ...prev]);
+      setGridItems((prev) => {
+        const filtered = prev.filter((p) => p.type !== 'placeholder' || !placeholderIds.includes(p.id));
+        return [...saved, ...filtered];
+      });
       recordGeneration(newImages.length);
       console.log(`✅ Generated and saved ${saved.length} image(s)`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate images';
       setError(errorMessage);
-      console.error('Generation error:', err);
+      setGridItems((prev) => prev.filter((p) => p.type !== 'placeholder' || !placeholderIds.includes(p.id)));
     } finally {
-      setIsGenerating(false);
+      setIsProcessing(false);
     }
-  }, []);
+  }, [isProcessing]);
+
+  useEffect(() => {
+    if (queue.length > 0 && !isProcessing) {
+      processBatch(queue[0]);
+    }
+  }, [queue, isProcessing, processBatch]);
+
+  const handleGenerate = useCallback((params: ImageGenerationParams, batchSize: number) => {
+    if (!params.prompt.trim()) {
+      setError('Please enter a prompt');
+      return;
+    }
+
+    setError(null);
+    const batchId = nextBatchId();
+    const batch: QueuedBatch = { id: batchId, params, batchSize };
+    const isFirst = queue.length === 0 && !isProcessing;
+
+    const placeholderIds = Array.from({ length: batchSize }, (_, i) => `ph-${batchId}-${i}`);
+    const placeholders: GridItem[] = placeholderIds.map((id) => ({
+      type: 'placeholder',
+      id,
+      status: isFirst ? ('generating' as const) : ('queued' as const),
+      aspectRatio: params.aspectRatio
+    }));
+
+    setGridItems((prev) => [...placeholders, ...prev]);
+
+    if (isFirst) {
+      processBatch(batch);
+    } else {
+      setQueue((q) => [...q, batch]);
+    }
+  }, [queue, isProcessing, processBatch]);
 
   const handleImageClick = useCallback((index: number) => {
     setSelectedImageIndex(index);
@@ -142,7 +194,7 @@ function App() {
       )}
 
       {/* Loading indicator */}
-      {isGenerating && (
+      {isProcessing && (
         <div className="fixed top-20 right-6 z-50">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
@@ -157,7 +209,7 @@ function App() {
           <div className="flex items-center justify-center min-h-[60vh] text-white/40">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/30 border-t-white"></div>
           </div>
-        ) : images.length === 0 ? (
+        ) : gridItems.length === 0 ? (
           <div className="flex items-center justify-center min-h-[60vh] text-white/40 text-center px-4">
             <div>
               <svg className="w-24 h-24 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,25 +221,29 @@ function App() {
           </div>
         ) : (
           <ImageGrid 
-            images={images.map(img => img.url)} 
+            items={gridItems} 
             onImageClick={handleImageClick}
           />
         )}
       </div>
 
       {/* Control Panel - Overlapping at bottom with liquid glass effect */}
-      <ControlPanel onGenerate={handleGenerate} isGenerating={isGenerating} />
+      <ControlPanel onGenerate={handleGenerate} isGenerating={isProcessing} />
 
       {/* Image Modal */}
-      {selectedImageIndex !== null && images[selectedImageIndex] && (
-        <ImageModal
-          imageUrl={images[selectedImageIndex]!.url}
-          prompt={images[selectedImageIndex]!.prompt}
-          aspectRatio={images[selectedImageIndex]!.aspectRatio}
-          imageSize={images[selectedImageIndex]!.imageSize}
-          onClose={handleCloseModal}
-        />
-      )}
+      {selectedImageIndex !== null && (() => {
+        const item = gridItems[selectedImageIndex];
+        if (!item || item.type !== 'image') return null;
+        return (
+          <ImageModal
+            imageUrl={item.url}
+            prompt={item.prompt}
+            aspectRatio={item.aspectRatio}
+            imageSize={item.imageSize}
+            onClose={handleCloseModal}
+          />
+        );
+      })()}
 
       {/* Statistics Modal */}
       {showStatistics && (

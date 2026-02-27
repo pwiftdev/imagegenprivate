@@ -19,7 +19,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
   const [selectedQuality, setSelectedQuality] = useState<typeof QUALITIES[number]>('1K');
   const [batchSize, setBatchSize] = useState(1);
   
-  // Track all object URLs for cleanup
   const objectUrlsRef = useRef<string[]>([]);
 
   // Cleanup object URLs when component unmounts
@@ -210,7 +209,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
               {/* Generate Button */}
               <button
                 onClick={handleGenerateClick}
-                disabled={isGenerating || !prompt.trim()}
+                disabled={!prompt.trim()}
                 className="ml-auto bg-lime-500 hover:bg-lime-600 text-black font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-lime-500/30 hover:shadow-lime-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-lime-500"
               >
                 {isGenerating ? (
