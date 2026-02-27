@@ -1,13 +1,16 @@
 import { useState, useCallback } from 'react';
 import ImageGrid from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
-import { generateBatchImages, GeneratedImage, ImageGenerationParams } from './services/imageGeneration';
+import ImageModal from './components/ImageModal';
+import { generateBatchImages } from './services/imageGeneration';
+import type { GeneratedImage, ImageGenerationParams } from './services/imageGeneration';
 import './App.css';
 
 function App() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   const handleGenerate = useCallback(async (params: ImageGenerationParams, batchSize: number) => {
     if (!params.prompt.trim()) {
@@ -32,6 +35,14 @@ function App() {
     } finally {
       setIsGenerating(false);
     }
+  }, []);
+
+  const handleImageClick = useCallback((index: number) => {
+    setSelectedImageIndex(index);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setSelectedImageIndex(null);
   }, []);
 
   return (
@@ -77,12 +88,26 @@ function App() {
             </div>
           </div>
         ) : (
-          <ImageGrid images={images.map(img => img.url)} />
+          <ImageGrid 
+            images={images.map(img => img.url)} 
+            onImageClick={handleImageClick}
+          />
         )}
       </div>
 
       {/* Control Panel - Overlapping at bottom with liquid glass effect */}
       <ControlPanel onGenerate={handleGenerate} isGenerating={isGenerating} />
+
+      {/* Image Modal */}
+      {selectedImageIndex !== null && images[selectedImageIndex] && (
+        <ImageModal
+          imageUrl={images[selectedImageIndex].url}
+          prompt={images[selectedImageIndex].prompt}
+          aspectRatio={images[selectedImageIndex].aspectRatio}
+          imageSize={images[selectedImageIndex].imageSize}
+          onClose={handleCloseModal}
+        />
+      )}
     </div>
   );
 }

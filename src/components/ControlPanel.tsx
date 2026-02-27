@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { ImageGenerationParams, fileToBase64 } from '../services/imageGeneration';
+import { fileToBase64 } from '../services/imageGeneration';
+import type { ImageGenerationParams } from '../services/imageGeneration';
 
 interface ControlPanelProps {
   onGenerate?: (params: ImageGenerationParams, batchSize: number) => void;
