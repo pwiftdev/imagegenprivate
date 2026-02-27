@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { fileToBase64 } from '../services/imageGeneration';
+import { compressImageForReference } from '../utils/compressImage';
 import type { ImageGenerationParams } from '../services/imageGeneration';
 
 interface ControlPanelProps {
@@ -43,9 +43,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
       objectUrlsRef.current.push(...newImages);
       setReferenceImages(prev => [...prev, ...newImages]);
       
-      // Convert to base64 for API
+      // Compress and convert to base64 (stays under Vercel's 4.5MB limit)
       try {
-        const base64Images = await Promise.all(filesArray.map(file => fileToBase64(file)));
+        const base64Images = await Promise.all(filesArray.map(file => compressImageForReference(file)));
         setReferenceImagesBase64(prev => [...prev, ...base64Images]);
       } catch (error) {
         console.error('Failed to convert images to base64:', error);
