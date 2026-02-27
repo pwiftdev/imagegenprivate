@@ -96,86 +96,88 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-2 md:p-4"
       onClick={onClose}
     >
       <div
-        className="relative flex max-w-5xl w-full max-h-[90vh] bg-black/60 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden shadow-2xl"
+        className="relative flex flex-col md:flex-row max-w-5xl w-full max-h-[90vh] bg-black/60 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-20 text-white/80 hover:text-white transition-colors p-1"
-          aria-label="Close"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
+        {/* Scrollable content - mobile: 1 col stack, desktop: side by side */}
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto">
+          {/* 1. Image */}
+          <div className="relative flex-shrink-0 flex items-center justify-center min-w-0 p-4 md:flex-1 md:p-6">
+            <img
+              src={imageUrl}
+              alt="Generated image"
+              className="max-w-full max-h-[50vh] md:max-h-[80vh] object-contain rounded-xl"
             />
-          </svg>
-        </button>
-
-        {/* Left: Image */}
-        <div className="flex-1 flex items-center justify-center min-w-0 p-6">
-          <img
-            src={imageUrl}
-            alt="Generated image"
-            className="max-w-full max-h-[80vh] object-contain rounded-xl"
-          />
-        </div>
-
-        {/* Right: Info panel */}
-        <div className="w-80 flex-shrink-0 flex flex-col border-l border-white/10">
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Branding */}
-            <div>
-              <img
-                src="/kreatorlogo.png"
-                alt="Kreator"
-                className="h-8 w-auto rounded-lg mb-2"
-              />
-              <p className="text-white/50 text-xs italic">By Kreator, for creators.</p>
-            </div>
-
-            {/* Prompt */}
-            {prompt && (
-              <div>
-                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1">
-                  Prompt
-                </p>
-                <p className="text-white/90 text-sm leading-relaxed">{prompt}</p>
-              </div>
-            )}
-
-            {/* Meta */}
-            <div className="flex gap-4 text-sm">
-              {aspectRatio && (
-                <div>
-                  <p className="text-white/50 text-xs mb-0.5">Ratio</p>
-                  <p className="text-white font-medium">{aspectRatio}</p>
-                </div>
-              )}
-              {imageSize && (
-                <div>
-                  <p className="text-white/50 text-xs mb-0.5">Quality</p>
-                  <p className="text-white font-medium">{imageSize}</p>
-                </div>
-              )}
-            </div>
+            {/* Close button - overlaps image, same border radius */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 md:top-6 md:right-6 z-20 flex items-center justify-center w-9 h-9 rounded-xl bg-black/60 hover:bg-black/80 text-white/90 hover:text-white transition-all"
+              aria-label="Close"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
 
-          {/* Actions */}
-          <div className="p-4 border-t border-white/10 space-y-2">
-            <div className="flex gap-2">
+          {/* 2. Info + 3. Buttons - desktop: sidebar | mobile: stacked below image */}
+          <div className="flex flex-col md:w-80 md:flex-shrink-0 md:border-l md:border-white/10">
+            {/* Info */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
+              {/* Branding */}
+              <div>
+                <img
+                  src="/kreatorlogo.png"
+                  alt="Kreator"
+                  className="h-8 w-auto rounded-lg mb-2"
+                />
+                <p className="text-white/50 text-xs italic">By Kreator, for creators.</p>
+              </div>
+
+              {/* Prompt */}
+              {prompt && (
+                <div>
+                  <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1">
+                    Prompt
+                  </p>
+                  <p className="text-white/90 text-sm leading-relaxed">{prompt}</p>
+                </div>
+              )}
+
+              {/* Meta */}
+              <div className="flex gap-4 text-sm">
+                {aspectRatio && (
+                  <div>
+                    <p className="text-white/50 text-xs mb-0.5">Ratio</p>
+                    <p className="text-white font-medium">{aspectRatio}</p>
+                  </div>
+                )}
+                {imageSize && (
+                  <div>
+                    <p className="text-white/50 text-xs mb-0.5">Quality</p>
+                    <p className="text-white font-medium">{imageSize}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex-shrink-0 p-4 border-t border-white/10 space-y-2">
+              <div className="flex gap-2">
               <button
                 onClick={handleDownload}
                 className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -214,8 +216,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Copy
               </button>
-            </div>
-            {isShareSupported && (
+              </div>
+              {isShareSupported && (
               <button
                 onClick={handleShare}
                 className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -235,8 +237,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Share
               </button>
-            )}
-            {prompt?.trim() && onReusePrompt && (
+              )}
+              {prompt?.trim() && onReusePrompt && (
               <button
                 onClick={handleReusePrompt}
                 className="w-full flex items-center justify-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -256,12 +258,13 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Reuse prompt
               </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs">
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs hidden md:block">
         Press <kbd className="px-2 py-0.5 bg-white/10 rounded">ESC</kbd> to close
       </p>
     </div>
