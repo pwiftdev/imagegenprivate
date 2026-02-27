@@ -62,7 +62,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
   }, [imageUrl]);
 
   const handleShare = useCallback(async () => {
-    if (navigator.share) {
+    if (typeof navigator.share === 'function') {
       try {
         const response = await fetch(imageUrl);
         const blob = await response.blob();
@@ -80,6 +80,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
       alert('Sharing is not supported in your browser');
     }
   }, [imageUrl, prompt]);
+
+  const isShareSupported = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   return (
     <div 
@@ -154,7 +156,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
               </button>
 
               {/* Share (if supported) */}
-              {navigator.share && (
+              {isShareSupported && (
                 <button
                   onClick={handleShare}
                   className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm"
