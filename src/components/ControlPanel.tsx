@@ -8,6 +8,7 @@ interface ControlPanelProps {
   promptToInject?: string | null;
   onPromptInjected?: () => void;
   onCloseMobile?: () => void;
+  className?: string;
 }
 
 // Constants moved outside component to avoid recreation on every render
@@ -20,6 +21,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   promptToInject,
   onPromptInjected,
   onCloseMobile,
+  className,
 }) => {
   const [prompt, setPrompt] = useState('');
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
@@ -109,7 +111,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, referenceImagesBase64, batchSize]);
 
   return (
-    <div className="w-[96%] md:w-[50%] mb-8 px-1 md:px-4">
+    <div className={`w-[96%] md:w-[50%] mb-8 px-1 md:px-4 ${className ?? ''}`}>
       <div className="relative">
         {/* Liquid glass effect container with blue shine */}
         <div className="relative rounded-3xl backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-2xl overflow-hidden">

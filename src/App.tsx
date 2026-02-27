@@ -310,7 +310,7 @@ function App() {
 
       {/* Control Panel - Overlapping at bottom with liquid glass effect */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 md:translate-y-0 ${
+        className={`fixed bottom-0 left-0 right-0 z-50 pointer-events-none transition-transform duration-300 md:translate-y-0 ${
           controlPanelOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'
         }`}
       >
@@ -321,6 +321,7 @@ function App() {
             promptToInject={promptToInject}
             onPromptInjected={handlePromptInjected}
             onCloseMobile={() => setControlPanelOpen(false)}
+            className="pointer-events-auto"
           />
         </div>
       </div>
