@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { ImageGenerationParams, fileToBase64 } from '../services/imageGeneration';
 
 interface ControlPanelProps {
-  onGenerate?: () => void;
+  onGenerate?: (params: ImageGenerationParams, batchSize: number) => void;
+  isGenerating?: boolean;
 }
 
 // Constants moved outside component to avoid recreation on every render
@@ -9,9 +11,10 @@ const ASPECT_RATIOS = ['1:1', '3:2', '4:3', '16:9', '9:16'] as const;
 const QUALITIES = ['1K', '2K', '4K'] as const;
 const MODELS = ['Nano Banana Pro', 'G Nano Banana Pro'] as const;
 
-const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate }) => {
+const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = false }) => {
   const [prompt, setPrompt] = useState('');
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [referenceImagesBase64, setReferenceImagesBase64] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<typeof MODELS[number]>('G Nano Banana Pro');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<typeof ASPECT_RATIOS[number]>('3:2');
   const [selectedQuality, setSelectedQuality] = useState<typeof QUALITIES[number]>('1K');
@@ -31,12 +34,23 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate }) => {
     };
   }, []);
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const newImages = Array.from(files).map(file => URL.createObjectURL(file));
+      const filesArray = Array.from(files);
+      
+      // Create object URLs for display
+      const newImages = filesArray.map(file => URL.createObjectURL(file));
       objectUrlsRef.current.push(...newImages);
       setReferenceImages(prev => [...prev, ...newImages]);
+      
+      // Convert to base64 for API
+      try {
+        const base64Images = await Promise.all(filesArray.map(file => fileToBase64(file)));
+        setReferenceImagesBase64(prev => [...prev, ...base64Images]);
+      } catch (error) {
+        console.error('Failed to convert images to base64:', error);
+      }
     }
     // Reset input to allow selecting the same file again
     e.target.value = '';
@@ -52,7 +66,23 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate }) => {
       }
       return prev.filter((_, i) => i !== index);
     });
+    
+    // Also remove from base64 array
+    setReferenceImagesBase64(prev => prev.filter((_, i) => i !== index));
   }, []);
+
+  const handleGenerateClick = useCallback(() => {
+    if (!onGenerate) return;
+
+    const params: ImageGenerationParams = {
+      prompt,
+      aspectRatio: selectedAspectRatio,
+      imageSize: selectedQuality,
+      referenceImages: referenceImagesBase64.length > 0 ? referenceImagesBase64 : undefined
+    };
+
+    onGenerate(params, batchSize);
+  }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, referenceImagesBase64, batchSize]);
 
   return (
     <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-[70%] mb-8 z-50">
@@ -199,10 +229,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate }) => {
 
               {/* Generate Button */}
               <button
-                onClick={onGenerate}
-                className="ml-auto bg-lime-500 hover:bg-lime-600 text-black font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-lime-500/30 hover:shadow-lime-500/50"
+                onClick={handleGenerateClick}
+                disabled={isGenerating || !prompt.trim()}
+                className="ml-auto bg-lime-500 hover:bg-lime-600 text-black font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-lime-500/30 hover:shadow-lime-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-lime-500"
               >
-                Generate +{batchSize}
+                {isGenerating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-black/30 border-t-black"></div>
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Generate +{batchSize}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
