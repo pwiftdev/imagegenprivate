@@ -8,18 +8,16 @@ interface ControlPanelProps {
 }
 
 // Constants moved outside component to avoid recreation on every render
-const ASPECT_RATIOS = ['1:1', '3:2', '4:3', '16:9', '9:16'] as const;
+const ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3', '5:4', '4:5'] as const;
 const QUALITIES = ['1K', '2K', '4K'] as const;
-const MODELS = ['Nano Banana Pro', 'G Nano Banana Pro'] as const;
 
 const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = false }) => {
   const [prompt, setPrompt] = useState('');
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [referenceImagesBase64, setReferenceImagesBase64] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<typeof MODELS[number]>('G Nano Banana Pro');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<typeof ASPECT_RATIOS[number]>('3:2');
   const [selectedQuality, setSelectedQuality] = useState<typeof QUALITIES[number]>('1K');
-  const [batchSize, setBatchSize] = useState(4);
+  const [batchSize, setBatchSize] = useState(1);
   
   // Track all object URLs for cleanup
   const objectUrlsRef = useRef<string[]>([]);
@@ -146,29 +144,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
 
             {/* Settings Row */}
             <div className="flex items-center gap-3 flex-wrap">
-              {/* AI Model Select */}
-              <div className="relative">
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value as typeof MODELS[number])}
-                  className="bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl pl-8 pr-8 py-2 text-white text-sm cursor-pointer hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 appearance-none transition-all"
-                >
-                  {MODELS.map((model) => (
-                    <option key={model} value={model} className="bg-gray-900">
-                      {model}
-                    </option>
-                  ))}
-                </select>
-                {selectedModel === 'G Nano Banana Pro' && (
-                  <div className="absolute left-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <span className="text-green-400 font-bold text-xs">G</span>
-                  </div>
-                )}
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+              {/* Model (locked) */}
+              <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl pl-3 pr-4 py-2 text-white text-sm">
+                <span className="text-green-400 font-bold text-xs">G</span>
+                <span>G Nano Banana Pro</span>
               </div>
 
               {/* Aspect Ratio Select */}
@@ -219,7 +198,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
                 >
                   −
                 </button>
-                <span className="text-white text-sm min-w-[3ch] text-center">{batchSize}/4</span>
+                <span className="text-white text-sm min-w-[3ch] text-center">{batchSize}</span>
                 <button
                   onClick={() => setBatchSize(Math.min(8, batchSize + 1))}
                   className="text-white/60 hover:text-white transition-colors"
