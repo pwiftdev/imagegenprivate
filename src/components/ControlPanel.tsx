@@ -85,19 +85,26 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
   return (
     <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-[70%] mb-8 z-50">
       <div className="relative">
-        {/* Liquid glass effect container */}
-        <div className="relative rounded-3xl p-6 backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-2xl overflow-hidden">
+        {/* Liquid glass effect container with blue shine */}
+        <div className="relative rounded-3xl backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-2xl overflow-hidden">
+          {/* Blue subtle shine overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-blue-400/5 pointer-events-none"></div>
           {/* Gradient overlay for liquid effect */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-50"></div>
-          
-          {/* Top border highlight */}
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-          
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-50 pointer-events-none"></div>
+          {/* Top border highlight with blue tint */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
           {/* Inner glow effect */}
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
+
+          {/* Info bar */}
+          <div className="relative z-10 px-6 py-3 border-b border-white/10 bg-blue-500/5">
+            <p className="text-white/70 text-sm">
+              Describe your vision, add reference images, and pick an aspect ratio. Powered by G Nano Banana Pro.
+            </p>
+          </div>
           
           {/* Content */}
-          <div className="relative z-10">
+          <div className="relative z-10 p-6">
             {/* Reference Images Grid */}
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -145,7 +152,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
             <div className="flex items-center gap-3 flex-wrap">
               {/* Model (locked) */}
               <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl pl-3 pr-4 py-2 text-white text-sm">
-                <span className="text-green-400 font-bold text-xs">G</span>
+                <span className="text-blue-400 font-bold text-xs">G</span>
                 <span>G Nano Banana Pro</span>
               </div>
 
@@ -210,16 +217,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onGenerate, isGenerating = 
               <button
                 onClick={handleGenerateClick}
                 disabled={!prompt.trim()}
-                className="ml-auto bg-lime-500 hover:bg-lime-600 text-black font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-lime-500/30 hover:shadow-lime-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-lime-500"
+                className="ml-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
               >
                 {isGenerating ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-black/30 border-t-black"></div>
-                    <span>Generating...</span>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                    <span>Kreating...</span>
                   </>
                 ) : (
                   <>
-                    <span>Generate +{batchSize}</span>
+                    <span>Kreate{batchSize > 1 ? ` +${batchSize}` : ''}</span>
                   </>
                 )}
               </button>

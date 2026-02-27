@@ -64,7 +64,7 @@ const StatisticsModal: React.FC<StatisticsModalProps> = ({ onClose }) => {
         <div className="p-6 space-y-6">
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/20 border-t-lime-500" />
+              <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/20 border-t-blue-500" />
             </div>
           ) : stats ? (
             <>
@@ -80,7 +80,7 @@ const StatisticsModal: React.FC<StatisticsModalProps> = ({ onClose }) => {
                 </div>
                 <div className="rounded-2xl bg-white/5 border border-white/10 p-4 col-span-2">
                   <p className="text-white/60 text-sm mb-1">Total Cost</p>
-                  <p className="text-2xl font-bold text-lime-400">${stats.totalCost.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-blue-400">${stats.totalCost.toFixed(2)}</p>
                   <p className="text-white/40 text-xs mt-1">$0.05 per image (Nano Banana Pro)</p>
                 </div>
               </div>
@@ -104,7 +104,7 @@ const StatisticsModal: React.FC<StatisticsModalProps> = ({ onClose }) => {
                           <span className="text-white/80 text-sm">
                             {month.images} image{month.images !== 1 ? 's' : ''}
                           </span>
-                          <span className="text-lime-400 font-medium">${month.cost.toFixed(2)}</span>
+                          <span className="text-blue-400 font-medium">${month.cost.toFixed(2)}</span>
                         </div>
                       </div>
                     ))}

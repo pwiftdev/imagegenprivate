@@ -1,6 +1,6 @@
 /* App-specific styles */
 
-/* Masonry grid – images pack tightly with no vertical gaps */
+/* Masonry grid – images pack tightly, newest top-left, flowing right */
 .grid-masonry {
   column-count: 2;
   column-gap: 2px;
@@ -24,4 +24,49 @@
   break-inside: avoid;
   margin-bottom: 2px;
   width: 100%;
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.grid-masonry-item.animate-pop-in {
+  animation: pop-in 0.25s ease-out forwards;
+  opacity: 0;
+}
+
+/* Auth screen background gradient blobs */
+@keyframes auth-blob-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 30px) scale(0.95); }
+}
+
+@keyframes auth-blob-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-40px, -30px) scale(1.1); }
+}
+
+@keyframes auth-blob-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(25px, 25px) scale(0.9); }
+  80% { transform: translate(-15px, -15px) scale(1.05); }
+}
+
+.auth-bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  pointer-events: none;
 }

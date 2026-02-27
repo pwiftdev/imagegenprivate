@@ -9,6 +9,7 @@ const BUCKET_NAME = 'generated-images';
 export interface StoredImage {
   id: string;
   created_at: string;
+  user_id: string | null;
   prompt: string | null;
   aspect_ratio: string | null;
   image_size: string | null;
@@ -62,16 +63,20 @@ export async function saveImageToSupabase(
 
   const publicUrl = urlData.publicUrl;
 
+  const { data: { user } } = await supabase.auth.getUser();
+  const insertPayload: Record<string, unknown> = {
+    prompt,
+    aspect_ratio: aspectRatio,
+    image_size: imageSize,
+    storage_path: storagePath,
+    file_name: fileName
+  };
+  if (user?.id) insertPayload.user_id = user.id;
+
   // Insert metadata
   const { data: row, error: dbError } = await supabase
     .from('images')
-    .insert({
-      prompt,
-      aspect_ratio: aspectRatio,
-      image_size: imageSize,
-      storage_path: storagePath,
-      file_name: fileName
-    })
+    .insert(insertPayload)
     .select()
     .single();
 
@@ -85,18 +90,28 @@ export async function saveImageToSupabase(
   };
 }
 
+export type ImageScope = 'mine' | 'all';
+
 /**
- * Fetch all images from Supabase (newest first)
+ * Fetch images from Supabase (newest first).
+ * scope: 'mine' = only current user's images, 'all' = everyone's images
  */
-export async function fetchImagesFromSupabase(): Promise<StoredImage[]> {
+export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promise<StoredImage[]> {
   if (!supabase) {
     return [];
   }
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from('images')
-    .select('id, created_at, prompt, aspect_ratio, image_size, storage_path, file_name')
+    .select('id, created_at, user_id, prompt, aspect_ratio, image_size, storage_path, file_name')
     .order('created_at', { ascending: false });
+
+  if (scope === 'mine') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) query = query.eq('user_id', user.id);
+  }
+
+  const { data: rows, error } = await query;
 
   if (error) {
     console.error('Failed to fetch images:', error);

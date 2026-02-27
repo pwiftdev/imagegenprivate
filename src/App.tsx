@@ -3,7 +3,8 @@ import ImageGrid from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
 import ImageModal from './components/ImageModal';
-import StatisticsModal from './components/StatisticsModal';
+import AuthScreen from './components/AuthScreen';
+import { useAuth } from './hooks/useAuth';
 import { generateBatchImages } from './services/imageGeneration';
 import { saveImageToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
 import { recordGeneration } from './services/stats';
@@ -12,7 +13,7 @@ import './App.css';
 
 type GridItem =
   | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string }
-  | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string };
+  | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface QueuedBatch {
   id: string;
@@ -26,19 +27,23 @@ function nextBatchId() {
 }
 
 function App() {
+  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth();
   const [gridItems, setGridItems] = useState<GridItem[]>([]);
   const [queue, setQueue] = useState<QueuedBatch[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
-  const [showStatistics, setShowStatistics] = useState(false);
+  const [qualityFilter, setQualityFilter] = useState<'All' | '1K' | '2K' | '4K'>('All');
+  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
-  // Load images from Supabase on mount
+  // Load images from Supabase (refetch when viewMode changes)
   useEffect(() => {
+    if (!user) return;
     async function load() {
+      setIsLoading(true);
       try {
-        const stored = await fetchImagesFromSupabase();
+        const stored = await fetchImagesFromSupabase(viewMode);
         setGridItems(
           stored.map((img) => ({
             type: 'image' as const,
@@ -62,7 +67,7 @@ function App() {
       }
     }
     load();
-  }, []);
+  }, [user?.id, viewMode]);
 
   const processBatch = useCallback(async (batch: QueuedBatch) => {
     if (isProcessing) return;
@@ -150,7 +155,8 @@ function App() {
       type: 'placeholder',
       id,
       status: isFirstInQueue ? ('generating' as const) : ('queued' as const),
-      aspectRatio: params.aspectRatio
+      aspectRatio: params.aspectRatio,
+      imageSize: params.imageSize
     }));
 
     setGridItems((prev) => [...placeholders, ...prev]);
@@ -165,10 +171,27 @@ function App() {
     setSelectedImageIndex(null);
   }, []);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-white/20 border-t-blue-500" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthScreen
+        onSignIn={async (email, password) => { await signIn(email, password); }}
+        onSignUp={async (email, password) => { await signUp(email, password); }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black pb-32 pt-14">
       {/* Header */}
-      <Header onStatisticsClick={() => setShowStatistics(true)} />
+      <Header onSignOut={signOut} />
 
       {/* Error notification */}
       {error && (
@@ -198,28 +221,73 @@ function App() {
         </div>
       )}
 
+      {/* Section title + quality filter + view mode */}
+      <div className="w-full px-6 pt-6 pb-2">
+        <div className="flex items-center gap-4 flex-wrap">
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            {viewMode === 'mine' ? 'Your Kreations' : 'What people are Kreating'}
+          </h1>
+          <button
+            onClick={() => setViewMode(viewMode === 'mine' ? 'all' : 'mine')}
+            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
+          >
+            {viewMode === 'mine' ? 'Show what people are Kreating' : 'Show only my Kreations'}
+          </button>
+          <div className="flex items-center gap-2">
+            {(['All', '1K', '2K', '4K'] as const).map((q) => (
+              <button
+                key={q}
+                onClick={() => setQualityFilter(q)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  qualityFilter === q
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                }`}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Image Grid Background */}
-      <div className="w-full pt-4">
+      <div className="w-full pt-2">
         {isLoading ? (
           <div className="flex items-center justify-center min-h-[60vh] text-white/40">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/30 border-t-white"></div>
           </div>
-        ) : gridItems.length === 0 ? (
-          <div className="flex items-center justify-center min-h-[60vh] text-white/40 text-center px-4">
-            <div>
-              <svg className="w-24 h-24 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <p className="text-lg">No images yet</p>
-              <p className="text-sm mt-2">Enter a prompt below to generate your first image</p>
+        ) : (() => {
+          const filteredItems = qualityFilter === 'All'
+            ? gridItems
+            : gridItems.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
+          return filteredItems.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[60vh] text-white/40 text-center px-4">
+              <div>
+                <svg className="w-24 h-24 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-lg">
+                  {viewMode === 'mine'
+                    ? (qualityFilter === 'All' ? 'No images yet' : `No ${qualityFilter} images`)
+                    : (qualityFilter === 'All' ? 'No one has shared yet' : `No ${qualityFilter} images`)}
+                </p>
+                <p className="text-sm mt-2">
+                  {viewMode === 'mine' && qualityFilter === 'All'
+                    ? 'Enter a prompt below to generate your first image'
+                    : viewMode === 'all'
+                      ? 'Be the first to share something!'
+                      : `Try selecting "All" or generate images at ${qualityFilter}`}
+                </p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <ImageGrid 
-            items={gridItems} 
-            onImageClick={handleImageClick}
-          />
-        )}
+          ) : (
+            <ImageGrid
+              items={filteredItems}
+              onImageClick={handleImageClick}
+            />
+          );
+        })()}
       </div>
 
       {/* Control Panel - Overlapping at bottom with liquid glass effect */}
@@ -227,7 +295,10 @@ function App() {
 
       {/* Image Modal */}
       {selectedImageIndex !== null && (() => {
-        const item = gridItems[selectedImageIndex];
+        const filteredItems = qualityFilter === 'All'
+          ? gridItems
+          : gridItems.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
+        const item = filteredItems[selectedImageIndex];
         if (!item || item.type !== 'image') return null;
         return (
           <ImageModal
@@ -240,10 +311,6 @@ function App() {
         );
       })()}
 
-      {/* Statistics Modal */}
-      {showStatistics && (
-        <StatisticsModal onClose={() => setShowStatistics(false)} />
-      )}
     </div>
   );
 }
