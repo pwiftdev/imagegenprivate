@@ -238,7 +238,7 @@ function App() {
             onClick={() => setViewMode(viewMode === 'mine' ? 'all' : 'mine')}
             className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
           >
-            {viewMode === 'mine' ? 'Show what people are Kreating' : 'Show only my Kreations'}
+            {viewMode === 'mine' ? 'See what people are Kreating' : 'Show only my Kreations'}
           </button>
           <div className="flex items-center gap-2">
             {(['All', '1K', '2K', '4K'] as const).map((q) => (
