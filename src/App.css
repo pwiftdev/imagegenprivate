@@ -1,32 +1,5 @@
 /* App-specific styles */
 
-/* Pinterest-style masonry – CSS columns, fixed column width, natural aspect ratios */
-.grid-masonry {
-  column-count: 2;
-  column-gap: 6px;
-  column-fill: balance;
-}
-
-@media (min-width: 640px) {
-  .grid-masonry { column-count: 3; }
-}
-@media (min-width: 768px) {
-  .grid-masonry { column-count: 4; }
-}
-@media (min-width: 1024px) {
-  .grid-masonry { column-count: 5; }
-}
-@media (min-width: 1280px) {
-  .grid-masonry { column-count: 6; }
-}
-
-.grid-masonry-item {
-  break-inside: avoid;
-  margin-bottom: 6px;
-  width: 100%;
-  overflow: hidden;
-}
-
 @keyframes pop-in {
   0% {
     opacity: 0;
@@ -41,7 +14,7 @@
   }
 }
 
-.grid-masonry-item.animate-pop-in {
+.animate-pop-in {
   animation: pop-in 0.25s ease-out forwards;
   opacity: 0;
 }

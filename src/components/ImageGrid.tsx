@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+import Masonry from '@mui/lab/Masonry';
 
 export type ImageGridItem =
   | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string }
@@ -24,14 +25,20 @@ function hashToDelay(id: string, maxMs: number): number {
 
 const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onCopyPrompt, onAddToReference }) => {
   return (
-    <div className="grid-masonry p-2 w-full">
+    <div className="p-2 w-full">
+      <Masonry
+        columns={{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+        spacing={1.5}
+        sequential
+        sx={{ width: '100%' }}
+      >
       {items.map((item, index) => {
         if (item.type === 'placeholder') {
           const isGenerating = item.status === 'generating';
           return (
             <div
               key={item.id}
-              className="grid-masonry-item animate-pop-in relative overflow-hidden flex items-center justify-center rounded-lg backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-xl"
+              className="animate-pop-in relative overflow-hidden flex items-center justify-center rounded-lg backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-xl"
               style={{ aspectRatio: parseAspectRatio(item.aspectRatio), animationDelay: `${hashToDelay(item.id, 800)}ms` }}
             >
               {/* Liquid glass gradient overlay */}
@@ -59,7 +66,7 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onCopyP
         return (
           <div
             key={item.id}
-            className="grid-masonry-item animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] rounded-lg"
+            className="animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] rounded-lg"
             style={{ animationDelay: `${hashToDelay(item.id, 800)}ms` }}
             onClick={() => onImageClick?.(index)}
           >
@@ -117,6 +124,7 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onCopyP
           </div>
         );
       })}
+      </Masonry>
     </div>
   );
 });
