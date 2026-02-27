@@ -7,6 +7,7 @@ interface ControlPanelProps {
   isGenerating?: boolean;
   promptToInject?: string | null;
   onPromptInjected?: () => void;
+  onCloseMobile?: () => void;
 }
 
 // Constants moved outside component to avoid recreation on every render
@@ -18,6 +19,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isGenerating = false,
   promptToInject,
   onPromptInjected,
+  onCloseMobile,
 }) => {
   const [prompt, setPrompt] = useState('');
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
@@ -107,7 +109,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, referenceImagesBase64, batchSize]);
 
   return (
-    <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-[90%] md:w-[50%] mb-8 z-50">
+    <div className="w-[96%] md:w-[50%] mb-8 px-1 md:px-4">
       <div className="relative">
         {/* Liquid glass effect container with blue shine */}
         <div className="relative rounded-3xl backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-2xl overflow-hidden">
@@ -123,9 +125,22 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           {/* Info bar */}
           <div className="relative z-10 px-6 py-3 border-b border-white/10 bg-blue-500/5 overflow-hidden">
             <div className="info-bar-shimmer" />
-            <p className="relative text-white/70 text-sm">
+            <div className="relative flex items-center justify-between gap-3">
+              <p className="text-white/70 text-sm flex-1">
               Describe your vision, add reference images, and pick an aspect ratio. Powered by Nano Banana Pro.
-            </p>
+              </p>
+              {onCloseMobile && (
+                <button
+                  onClick={onCloseMobile}
+                  className="md:hidden flex-shrink-0 text-white/80 hover:text-white p-1"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           
           {/* Content */}

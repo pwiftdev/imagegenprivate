@@ -37,6 +37,7 @@ function App() {
   const [qualityFilter, setQualityFilter] = useState<'All' | '1K' | '2K' | '4K'>('All');
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
   const [promptToInject, setPromptToInject] = useState<string | null>(null);
+  const [controlPanelOpen, setControlPanelOpen] = useState(false);
 
   // Load images from Supabase (refetch when viewMode changes)
   useEffect(() => {
@@ -297,13 +298,32 @@ function App() {
         })()}
       </div>
 
+      {/* Start Kreating button - mobile only, when panel is closed */}
+      {!controlPanelOpen && (
+        <button
+          onClick={() => setControlPanelOpen(true)}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 md:hidden bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all"
+        >
+          Start Kreating
+        </button>
+      )}
+
       {/* Control Panel - Overlapping at bottom with liquid glass effect */}
-      <ControlPanel
-        onGenerate={handleGenerate}
-        isGenerating={isProcessing}
-        promptToInject={promptToInject}
-        onPromptInjected={handlePromptInjected}
-      />
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 md:translate-y-0 ${
+          controlPanelOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'
+        }`}
+      >
+        <div className="flex justify-center">
+          <ControlPanel
+            onGenerate={handleGenerate}
+            isGenerating={isProcessing}
+            promptToInject={promptToInject}
+            onPromptInjected={handlePromptInjected}
+            onCloseMobile={() => setControlPanelOpen(false)}
+          />
+        </div>
+      </div>
 
       {/* Image Modal */}
       {selectedImageIndex !== null && (() => {
