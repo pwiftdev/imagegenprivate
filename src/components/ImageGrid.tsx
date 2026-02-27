@@ -7,6 +7,8 @@ export type ImageGridItem =
 interface ImageGridProps {
   items: ImageGridItem[];
   onImageClick?: (index: number) => void;
+  onCopyPrompt?: (prompt: string) => void;
+  onAddToReference?: (imageUrl: string) => void;
 }
 
 function parseAspectRatio(ratio: string): string {
@@ -20,7 +22,7 @@ function hashToDelay(id: string, maxMs: number): number {
   return Math.abs(h % 1000) / 1000 * maxMs;
 }
 
-const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick }) => {
+const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onCopyPrompt, onAddToReference }) => {
   return (
     <div className="grid-masonry p-2 w-full">
       {items.map((item, index) => {
@@ -29,12 +31,12 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick }) => {
           return (
             <div
               key={item.id}
-              className="grid-masonry-item animate-pop-in relative overflow-hidden flex items-center justify-center rounded-2xl backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-xl"
+              className="grid-masonry-item animate-pop-in relative overflow-hidden flex items-center justify-center rounded-lg backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-xl"
               style={{ aspectRatio: parseAspectRatio(item.aspectRatio), animationDelay: `${hashToDelay(item.id, 800)}ms` }}
             >
               {/* Liquid glass gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-50 rounded-2xl" />
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent rounded-t-2xl" />
+              <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-50 rounded-lg" />
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent rounded-t-lg" />
               <div className="relative z-10 flex flex-col items-center gap-3">
                 {isGenerating ? (
                   <>
@@ -57,21 +59,60 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick }) => {
         return (
           <div
             key={item.id}
-            className="grid-masonry-item animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.06]"
-            style={{ aspectRatio: parseAspectRatio(item.aspectRatio), animationDelay: `${hashToDelay(item.id, 800)}ms` }}
+            className="grid-masonry-item animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] rounded-lg"
+            style={{ animationDelay: `${hashToDelay(item.id, 800)}ms` }}
             onClick={() => onImageClick?.(index)}
           >
             <img
               src={item.url}
               alt={`Generated image ${index + 1}`}
-              className="w-full h-full object-cover"
+              className="w-full h-auto block rounded-lg"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.src = `https://via.placeholder.com/400x400/1a1a1a/666666?text=Image+${index + 1}`;
               }}
             />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span className="text-white text-sm font-medium">Click to view</span>
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onImageClick?.(index); }}
+                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors"
+                title="Preview"
+                aria-label="Preview"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (item.prompt) {
+                    navigator.clipboard.writeText(item.prompt);
+                    onCopyPrompt?.(item.prompt);
+                  }
+                }}
+                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors"
+                title="Copy prompt"
+                aria-label="Copy prompt"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToReference?.(item.url);
+                }}
+                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors"
+                title="Add to reference"
+                aria-label="Add to reference"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </button>
             </div>
           </div>
         );

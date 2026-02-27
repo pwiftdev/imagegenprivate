@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { compressImageForReference } from '../utils/compressImage';
+import { compressImageForReference, compressImageFromUrl } from '../utils/compressImage';
 import type { ImageGenerationParams } from '../services/imageGeneration';
 
 interface ControlPanelProps {
@@ -7,6 +7,8 @@ interface ControlPanelProps {
   isGenerating?: boolean;
   promptToInject?: string | null;
   onPromptInjected?: () => void;
+  referenceImageUrlToInject?: string | null;
+  onReferenceImageInjected?: () => void;
   onCloseMobile?: () => void;
   className?: string;
 }
@@ -20,6 +22,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isGenerating = false,
   promptToInject,
   onPromptInjected,
+  referenceImageUrlToInject,
+  onReferenceImageInjected,
   onCloseMobile,
   className,
 }) => {
@@ -48,6 +52,22 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       onPromptInjected?.();
     }
   }, [promptToInject, onPromptInjected]);
+
+  useEffect(() => {
+    if (!referenceImageUrlToInject?.trim()) return;
+    (async () => {
+      try {
+        const base64 = await compressImageFromUrl(referenceImageUrlToInject);
+        setReferenceImages(prev => [...prev, referenceImageUrlToInject]);
+        setReferenceImagesBase64(prev => [...prev, base64]);
+        onReferenceImageInjected?.();
+      } catch (err) {
+        console.error('Failed to add reference image:', err);
+      } finally {
+        onReferenceImageInjected?.();
+      }
+    })();
+  }, [referenceImageUrlToInject, onReferenceImageInjected]);
 
   // Cleanup object URLs when component unmounts
   useEffect(() => {

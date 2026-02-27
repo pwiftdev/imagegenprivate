@@ -60,3 +60,11 @@ export async function compressImageForReference(file: File): Promise<string> {
     img.src = url;
   });
 }
+
+/** Fetch image from URL and compress for reference use. */
+export async function compressImageFromUrl(imageUrl: string): Promise<string> {
+  const response = await fetch(imageUrl);
+  const blob = await response.blob();
+  const file = new File([blob], 'reference.png', { type: blob.type || 'image/png' });
+  return compressImageForReference(file);
+}

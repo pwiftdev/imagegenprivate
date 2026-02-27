@@ -110,12 +110,12 @@ const ImageModal: React.FC<ImageModalProps> = ({
             <img
               src={imageUrl}
               alt="Generated image"
-              className="max-w-full max-h-[50vh] md:max-h-[80vh] object-contain rounded-xl"
+              className="max-w-full max-h-[50vh] md:max-h-[80vh] object-contain rounded-lg"
             />
             {/* Close button - overlaps image, same border radius */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 md:top-6 md:right-6 z-20 flex items-center justify-center w-9 h-9 rounded-xl bg-black/60 hover:bg-black/80 text-white/90 hover:text-white transition-all"
+              className="absolute top-4 right-4 md:top-6 md:right-6 z-20 flex items-center justify-center w-9 h-9 rounded-lg bg-black/60 hover:bg-black/80 text-white/90 hover:text-white transition-all"
               aria-label="Close"
             >
               <svg

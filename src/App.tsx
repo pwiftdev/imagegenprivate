@@ -37,7 +37,9 @@ function App() {
   const [qualityFilter, setQualityFilter] = useState<'All' | '1K' | '2K' | '4K'>('All');
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
   const [promptToInject, setPromptToInject] = useState<string | null>(null);
+  const [referenceImageUrlToInject, setReferenceImageUrlToInject] = useState<string | null>(null);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
+  const [copiedFeedback, setCopiedFeedback] = useState(false);
 
   // Load images from Supabase (refetch when viewMode changes)
   useEffect(() => {
@@ -46,14 +48,16 @@ function App() {
       setIsLoading(true);
       try {
         const stored = await fetchImagesFromSupabase(viewMode);
-        const newImages: GridItem[] = stored.map((img) => ({
-          type: 'image' as const,
-          id: img.id,
-          url: img.url,
-          aspectRatio: img.aspect_ratio || '',
-          prompt: img.prompt || '',
-          imageSize: img.image_size || ''
-        }));
+        const newImages: GridItem[] = stored
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .map((img) => ({
+            type: 'image' as const,
+            id: img.id,
+            url: img.url,
+            aspectRatio: img.aspect_ratio || '',
+            prompt: img.prompt || '',
+            imageSize: img.image_size || ''
+          }));
         setGridItems((prev) => {
           const placeholders = prev.filter((item): item is Extract<GridItem, { type: 'placeholder' }> => item.type === 'placeholder');
           return [...placeholders, ...newImages];
@@ -179,6 +183,16 @@ function App() {
     setPromptToInject(null);
   }, []);
 
+  const handleReferenceImageInjected = useCallback(() => {
+    setReferenceImageUrlToInject(null);
+    setControlPanelOpen(true);
+  }, []);
+
+  const handleCopyPrompt = useCallback((prompt: string) => {
+    setCopiedFeedback(true);
+    setTimeout(() => setCopiedFeedback(false), 2000);
+  }, []);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -215,6 +229,15 @@ function App() {
             >
               ×
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Copied toast */}
+      {copiedFeedback && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-white/20 backdrop-blur-xl border border-white/30 text-white px-4 py-2 rounded-lg text-sm">
+            Copied to clipboard!
           </div>
         </div>
       )}
@@ -293,6 +316,8 @@ function App() {
             <ImageGrid
               items={filteredItems}
               onImageClick={handleImageClick}
+              onCopyPrompt={handleCopyPrompt}
+              onAddToReference={(url) => { setReferenceImageUrlToInject(url); setControlPanelOpen(true); }}
             />
           );
         })()}
@@ -320,6 +345,8 @@ function App() {
             isGenerating={isProcessing}
             promptToInject={promptToInject}
             onPromptInjected={handlePromptInjected}
+            referenceImageUrlToInject={referenceImageUrlToInject}
+            onReferenceImageInjected={handleReferenceImageInjected}
             onCloseMobile={() => setControlPanelOpen(false)}
             className="pointer-events-auto"
           />
