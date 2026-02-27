@@ -143,24 +143,19 @@ function App() {
     setError(null);
     const batchId = nextBatchId();
     const batch: QueuedBatch = { id: batchId, params, batchSize };
-    const isFirst = queue.length === 0 && !isProcessing;
+    const isFirstInQueue = queue.length === 0;
 
     const placeholderIds = Array.from({ length: batchSize }, (_, i) => `ph-${batchId}-${i}`);
     const placeholders: GridItem[] = placeholderIds.map((id) => ({
       type: 'placeholder',
       id,
-      status: isFirst ? ('generating' as const) : ('queued' as const),
+      status: isFirstInQueue ? ('generating' as const) : ('queued' as const),
       aspectRatio: params.aspectRatio
     }));
 
     setGridItems((prev) => [...placeholders, ...prev]);
-
-    if (isFirst) {
-      processBatch(batch);
-    } else {
-      setQueue((q) => [...q, batch]);
-    }
-  }, [queue, isProcessing, processBatch]);
+    setQueue((q) => [...q, batch]);
+  }, [queue]);
 
   const handleImageClick = useCallback((index: number) => {
     setSelectedImageIndex(index);

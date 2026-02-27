@@ -1,13 +1,26 @@
-import React, { useEffect } from 'react';
-import { getStats, getMonthlyOverview } from '../services/stats';
+import React, { useEffect, useState } from 'react';
+import { fetchStatsFromSupabase } from '../services/imageStorage';
 
 interface StatisticsModalProps {
   onClose: () => void;
 }
 
 const StatisticsModal: React.FC<StatisticsModalProps> = ({ onClose }) => {
-  const stats = getStats();
-  const monthlyOverview = getMonthlyOverview();
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof fetchStatsFromSupabase>> | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchStatsFromSupabase().then((data) => {
+      if (!cancelled) {
+        setStats(data);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -49,71 +62,81 @@ const StatisticsModal: React.FC<StatisticsModalProps> = ({ onClose }) => {
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <p className="text-white/60 text-sm mb-1">Total Images Generated</p>
-              <p className="text-2xl font-bold text-white">{stats.totalImages.toLocaleString()}</p>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/20 border-t-lime-500" />
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <p className="text-white/60 text-sm mb-1">API Calls</p>
-              <p className="text-2xl font-bold text-white">{stats.totalApiCalls.toLocaleString()}</p>
-            </div>
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 col-span-2">
-              <p className="text-white/60 text-sm mb-1">Total Cost</p>
-              <p className="text-2xl font-bold text-lime-400">${stats.totalCost.toFixed(2)}</p>
-              <p className="text-white/40 text-xs mt-1">$0.05 per image (Nano Banana Pro)</p>
-            </div>
-          </div>
-
-          {/* Monthly Overview */}
-          <div>
-            <h3 className="text-white font-medium mb-3">Monthly Overview</h3>
-            {monthlyOverview.length === 0 ? (
-              <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center text-white/50 text-sm">
-                No data yet. Generate some images to see your usage over time.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {monthlyOverview.map((month) => (
-                  <div
-                    key={month.month}
-                    className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 px-4 py-3"
-                  >
-                    <span className="text-white font-medium">{month.month}</span>
-                    <div className="flex items-center gap-6">
-                      <span className="text-white/80 text-sm">
-                        {month.images} image{month.images !== 1 ? 's' : ''}
-                      </span>
-                      <span className="text-lime-400 font-medium">${month.cost.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Generation Sessions */}
-          {stats.records.length > 0 && (
-            <div>
-              <h3 className="text-white font-medium mb-3">Recent Activity</h3>
-              <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
-                <div className="max-h-48 overflow-y-auto">
-                  {[...stats.records].reverse().slice(-10).map((record, i) => (
-                    <div
-                      key={`${record.timestamp}-${i}`}
-                      className="flex items-center justify-between px-4 py-2 border-b border-white/5 last:border-0"
-                    >
-                      <span className="text-white/60 text-sm">
-                        {new Date(record.timestamp).toLocaleString()}
-                      </span>
-                      <span className="text-white text-sm">
-                        {record.imageCount} image{record.imageCount !== 1 ? 's' : ''} • ${record.cost.toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+          ) : stats ? (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <p className="text-white/60 text-sm mb-1">Total Images Generated</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalImages.toLocaleString()}</p>
+                </div>
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <p className="text-white/60 text-sm mb-1">API Calls</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalApiCalls.toLocaleString()}</p>
+                </div>
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-4 col-span-2">
+                  <p className="text-white/60 text-sm mb-1">Total Cost</p>
+                  <p className="text-2xl font-bold text-lime-400">${stats.totalCost.toFixed(2)}</p>
+                  <p className="text-white/40 text-xs mt-1">$0.05 per image (Nano Banana Pro)</p>
                 </div>
               </div>
+
+              {/* Monthly Overview */}
+              <div>
+                <h3 className="text-white font-medium mb-3">Monthly Overview</h3>
+                {stats.monthlyOverview.length === 0 ? (
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center text-white/50 text-sm">
+                    No data yet. Generate some images to see your usage over time.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.monthlyOverview.map((month) => (
+                      <div
+                        key={month.month}
+                        className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 px-4 py-3"
+                      >
+                        <span className="text-white font-medium">{month.month}</span>
+                        <div className="flex items-center gap-6">
+                          <span className="text-white/80 text-sm">
+                            {month.images} image{month.images !== 1 ? 's' : ''}
+                          </span>
+                          <span className="text-lime-400 font-medium">${month.cost.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Activity */}
+              {stats.recentActivity.length > 0 && (
+                <div>
+                  <h3 className="text-white font-medium mb-3">Recent Activity</h3>
+                  <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
+                    <div className="max-h-48 overflow-y-auto">
+                      {stats.recentActivity.map((record, i) => (
+                        <div
+                          key={`${record.date}-${i}`}
+                          className="flex items-center justify-between px-4 py-2 border-b border-white/5 last:border-0"
+                        >
+                          <span className="text-white/60 text-sm">{record.date}</span>
+                          <span className="text-white text-sm">
+                            {record.count} image{record.count !== 1 ? 's' : ''} • ${record.cost.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center text-white/50 text-sm">
+              Failed to load statistics.
             </div>
           )}
         </div>

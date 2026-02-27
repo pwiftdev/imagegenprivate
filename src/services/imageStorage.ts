@@ -122,3 +122,92 @@ export async function fetchImagesFromSupabase(): Promise<StoredImage[]> {
     };
   });
 }
+
+const COST_PER_IMAGE = 0.05;
+
+export interface ImageStats {
+  totalImages: number;
+  totalApiCalls: number;
+  totalCost: number;
+  monthlyOverview: { month: string; images: number; cost: number }[];
+  recentActivity: { date: string; count: number; cost: number }[];
+}
+
+/**
+ * Fetch stats derived from Supabase (source of truth for image count)
+ */
+export async function fetchStatsFromSupabase(): Promise<ImageStats> {
+  if (!supabase) {
+    return {
+      totalImages: 0,
+      totalApiCalls: 0,
+      totalCost: 0,
+      monthlyOverview: [],
+      recentActivity: []
+    };
+  }
+
+  const { data: rows, error } = await supabase
+    .from('images')
+    .select('id, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Failed to fetch stats:', error);
+    return {
+      totalImages: 0,
+      totalApiCalls: 0,
+      totalCost: 0,
+      monthlyOverview: [],
+      recentActivity: []
+    };
+  }
+
+  const images = rows || [];
+  const totalImages = images.length;
+  const totalCost = totalImages * COST_PER_IMAGE;
+
+  const byMonth = new Map<string, { images: number; cost: number }>();
+  const byDay = new Map<string, { count: number; cost: number }>();
+
+  for (const img of images) {
+    const date = new Date(img.created_at);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const dayKey = date.toISOString().slice(0, 10);
+
+    if (!byMonth.has(monthKey)) byMonth.set(monthKey, { images: 0, cost: 0 });
+    const m = byMonth.get(monthKey)!;
+    m.images += 1;
+    m.cost += COST_PER_IMAGE;
+
+    if (!byDay.has(dayKey)) byDay.set(dayKey, { count: 0, cost: 0 });
+    const d = byDay.get(dayKey)!;
+    d.count += 1;
+    d.cost += COST_PER_IMAGE;
+  }
+
+  const monthlyOverview = Array.from(byMonth.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([key, data]) => ({
+      month: new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      images: data.images,
+      cost: data.cost
+    }));
+
+  const recentActivity = Array.from(byDay.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 10)
+    .map(([dateStr, data]) => ({
+      date: new Date(dateStr).toLocaleDateString('en-US', { dateStyle: 'medium' }),
+      count: data.count,
+      cost: data.cost
+    }));
+
+  return {
+    totalImages,
+    totalApiCalls: totalImages,
+    totalCost,
+    monthlyOverview,
+    recentActivity
+  };
+}
