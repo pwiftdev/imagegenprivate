@@ -12,7 +12,8 @@ export interface Profile {
   updated_at: string;
 }
 
-const AVATARS_BUCKET = 'avatars';
+const AVATARS_BUCKET = 'generated-images';
+const AVATARS_PATH_PREFIX = 'avatars/';
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   if (!supabase) return null;
@@ -54,7 +55,7 @@ export async function uploadAvatar(userId: string, file: File): Promise<string> 
   if (!supabase) throw new Error('Supabase not configured');
 
   const ext = file.type.includes('png') ? 'png' : 'jpg';
-  const path = `${userId}/${Date.now()}.${ext}`;
+  const path = `${AVATARS_PATH_PREFIX}${userId}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from(AVATARS_BUCKET)

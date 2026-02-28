@@ -42,18 +42,5 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 5. Create avatars storage bucket (must do in Supabase Dashboard)
---    Dashboard > Storage > New bucket
---    - Name: avatars
---    - Public bucket: Yes (so profile pictures are viewable)
---
--- 6. Add storage policies for avatars bucket:
---    Dashboard > Storage > avatars > Policies > New policy
---
---    Policy 1: "Authenticated users can upload"
---    - Allowed operation: INSERT
---    - Policy definition: (bucket_id = 'avatars' AND auth.role() = 'authenticated')
---
---    Policy 2: "Public read for avatars"
---    - Allowed operation: SELECT
---    - Policy definition: true
+-- 5. Profile pictures use the existing "generated-images" bucket under avatars/
+--    path. No extra bucket or policies needed.
