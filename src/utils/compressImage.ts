@@ -1,11 +1,10 @@
 /**
- * Compress reference images to stay under Vercel's 4.5MB request limit.
- * Resizes to max 1024px and compresses as JPEG.
+ * Compress reference images to stay under Vercel's 4.5MB request body limit.
+ * Aggressive compression: 768px max, ~280KB per image → safe for up to 6 refs.
  */
-
-const MAX_DIMENSION = 1024;
-const JPEG_QUALITY = 0.7;
-const MAX_SIZE_CHARS = 450000; // ~500KB base64 per image; 4.5MB total limit / ~8 refs
+const MAX_DIMENSION = 768;
+const JPEG_QUALITY = 0.55;
+const MAX_SIZE_CHARS = 280000; // ~280KB base64 per image; 6 refs ≈ 1.7MB, well under 4.5MB
 
 export async function compressImageForReference(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -44,8 +43,8 @@ export async function compressImageForReference(file: File): Promise<string> {
       };
 
       let dataUrl = tryEncode();
-      while (dataUrl.length > MAX_SIZE_CHARS && quality > 0.2) {
-        quality -= 0.1;
+      while (dataUrl.length > MAX_SIZE_CHARS && quality > 0.15) {
+        quality -= 0.08;
         dataUrl = tryEncode();
       }
 

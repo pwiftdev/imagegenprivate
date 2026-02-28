@@ -17,6 +17,7 @@ interface ControlPanelProps {
 // Constants moved outside component to avoid recreation on every render
 const ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3', '5:4', '4:5'] as const;
 const QUALITIES = ['1K', '2K', '4K'] as const;
+const MAX_REFERENCE_IMAGES = 6; // Keep under Vercel 4.5MB request body limit
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
   onGenerate,
@@ -61,8 +62,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     (async () => {
       try {
         const base64 = await compressImageFromUrl(referenceImageUrlToInject);
-        setReferenceImages(prev => [...prev, referenceImageUrlToInject]);
-        setReferenceImagesBase64(prev => [...prev, base64]);
+        setReferenceImages(prev => {
+          if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
+          return [...prev, referenceImageUrlToInject];
+        });
+        setReferenceImagesBase64(prev => {
+          if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
+          return [...prev, base64];
+        });
         onReferenceImageInjected?.();
       } catch (err) {
         console.error('Failed to add reference image:', err);
@@ -86,16 +93,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const addImagesFromFiles = useCallback(async (files: File[]) => {
     const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
     if (validFiles.length === 0) return;
-    const newUrls = validFiles.map(f => URL.createObjectURL(f));
+    const remaining = MAX_REFERENCE_IMAGES - referenceImages.length;
+    if (remaining <= 0) return;
+    const toAdd = validFiles.slice(0, remaining);
+    const newUrls = toAdd.map(f => URL.createObjectURL(f));
     objectUrlsRef.current.push(...newUrls);
     setReferenceImages(prev => [...prev, ...newUrls]);
     try {
-      const base64Images = await Promise.all(validFiles.map(f => compressImageForReference(f)));
+      const base64Images = await Promise.all(toAdd.map(f => compressImageForReference(f)));
       setReferenceImagesBase64(prev => [...prev, ...base64Images]);
     } catch (err) {
       console.error('Failed to compress images:', err);
     }
-  }, []);
+  }, [referenceImages.length]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -149,6 +159,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
   }, [addImagesFromFiles]);
+
+  const canAddMoreRefs = referenceImages.length < MAX_REFERENCE_IMAGES;
 
   const handleEnhanceClick = useCallback(async () => {
     const text = prompt.trim();
@@ -222,6 +234,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
                 onDrop={(e) => {
                   e.preventDefault();
+                  if (!canAddMoreRefs) return;
                   const files = e.dataTransfer.files;
                   if (files.length > 0) addImagesFromFiles(Array.from(files));
                 }}
@@ -242,9 +255,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     onDrop={(e) => {
                       e.preventDefault();
                       const files = e.dataTransfer.files;
-                      if (files.length > 0) {
+                      if (files.length > 0 && canAddMoreRefs) {
                         addImagesFromFiles(Array.from(files));
-                      } else {
+                      } else if (files.length === 0) {
                         const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
                         if (!Number.isNaN(from) && from !== index) reorderReferenceImages(from, index);
                       }
@@ -263,20 +276,30 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </button>
                   </div>
                 ))}
-                <label className="flex-shrink-0 w-14 h-14 border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center cursor-pointer hover:border-white/50 transition-all bg-white/5 backdrop-blur-sm hover:bg-white/10">
+                <label
+                  className={`flex-shrink-0 w-14 h-14 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
+                    canAddMoreRefs
+                      ? 'border-white/30 cursor-pointer hover:border-white/50 bg-white/5 hover:bg-white/10'
+                      : 'border-white/20 cursor-not-allowed opacity-50'
+                  }`}
+                  title={canAddMoreRefs ? 'Add reference images (max 6)' : 'Max 6 reference images'}
+                >
                   <input
                     type="file"
                     multiple
                     accept="image/*"
                     onChange={handleFileUpload}
                     className="hidden"
+                    disabled={!canAddMoreRefs}
                   />
                   <svg className="w-6 h-6 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 </label>
               </div>
-              <p className="text-white/40 text-xs mt-1">Drag to reorder · Ctrl/Cmd+V to paste from clipboard</p>
+              <p className="text-white/40 text-xs mt-1">
+                Max {MAX_REFERENCE_IMAGES} refs · Drag to reorder · Ctrl/Cmd+V to paste
+              </p>
             </div>
 
             {/* Prompt Input */}
