@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const LAOZHANG_API_KEY = process.env.LAOZHANG_API_KEY;
 const LAOZHANG_API_URL = process.env.LAOZHANG_API_URL || 'https://api.laozhang.ai';
-const ENHANCE_MODEL = process.env.ENHANCE_PROMPT_MODEL || 'gpt-5';
+const ENHANCE_MODEL = process.env.ENHANCE_PROMPT_MODEL || 'gpt-4o-mini';
 
 const SYSTEM_PROMPT = `You are a prompt enhancer for image generation.
 
@@ -55,10 +55,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      return res.status(response.status).json({
-        error: errData.error?.message || `API error: ${response.status} ${response.statusText}`,
-      });
+      const errText = await response.text();
+      let errMsg = `API error: ${response.status}`;
+      try {
+        const errData = JSON.parse(errText);
+        errMsg = errData.error?.message || errData.error || errMsg;
+      } catch {
+        if (errText) errMsg = errText.slice(0, 200);
+      }
+      console.error('LaoZhang enhance error:', response.status, errMsg);
+      return res.status(500).json({ error: errMsg });
     }
 
     const result = (await response.json()) as {
