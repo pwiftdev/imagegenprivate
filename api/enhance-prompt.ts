@@ -112,10 +112,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
-    const enhanced = result.choices?.[0]?.message?.content?.trim();
+    let enhanced = result.choices?.[0]?.message?.content?.trim();
 
     if (!enhanced) {
       return res.status(500).json({ error: 'No enhanced prompt returned' });
+    }
+
+    // Strip surrounding quotes (single or double) - model sometimes returns "prompt"
+    if ((enhanced.startsWith('"') && enhanced.endsWith('"')) || (enhanced.startsWith("'") && enhanced.endsWith("'"))) {
+      enhanced = enhanced.slice(1, -1);
     }
 
     return res.status(200).json({ enhancedPrompt: enhanced });
