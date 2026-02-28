@@ -44,31 +44,32 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Animated gradient blobs */}
+    <div className="min-h-screen h-screen flex bg-black relative">
+      {/* Full-screen background - goes behind everything */}
       <div
-        className="auth-bg-blob w-96 h-96 bg-blue-500 -top-48 -left-48"
-        style={{ animation: 'auth-blob-1 15s ease-in-out infinite' }}
-      />
-      <div
-        className="auth-bg-blob w-80 h-80 bg-blue-600 bottom-1/4 -right-32"
-        style={{ animation: 'auth-blob-2 18s ease-in-out infinite' }}
-      />
-      <div
-        className="auth-bg-blob w-72 h-72 bg-blue-400/80 top-1/2 left-1/4"
-        style={{ animation: 'auth-blob-3 20s ease-in-out infinite' }}
-      />
-      <div
-        className="auth-bg-blob w-64 h-64 bg-indigo-500/60 -bottom-24 left-1/3"
-        style={{ animation: 'auth-blob-1 22s ease-in-out infinite reverse' }}
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url(/background.jpg)' }}
       />
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="relative rounded-3xl backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-2xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-blue-400/5 pointer-events-none" />
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
+      {/* Left side - empty, background shows through */}
+      <div className="hidden md:block flex-1 min-w-0" />
 
-          <div className="relative z-10 p-8">
+      {/* Right panel - touches top, right, bottom on desktop; full width on mobile */}
+      <div
+        className={`
+          w-full md:w-[420px] flex-shrink-0
+          md:min-h-screen md:h-screen
+          md:rounded-l-3xl
+          flex flex-col justify-center
+          md:border-l border-white/20
+          backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5
+          relative overflow-auto
+          p-8 md:p-12
+        `}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-blue-400/5 pointer-events-none rounded-l-3xl" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
+        <div className="relative z-10 w-full max-w-sm mx-auto md:mx-0">
             <div className="text-center mb-8">
               <img src="/kreatorlogo.png" alt="Kreator" className="h-12 w-auto mx-auto mb-4 rounded-xl" />
               <h1 className="text-2xl font-bold text-white tracking-tight">Kreator</h1>
@@ -163,7 +164,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
                 </>
               )}
             </p>
-          </div>
         </div>
       </div>
     </div>
