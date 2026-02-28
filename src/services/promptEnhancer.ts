@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 export async function enhancePrompt(prompt: string): Promise<string> {
   const response = await fetch(`${API_BASE}/api/enhance-prompt`, {
