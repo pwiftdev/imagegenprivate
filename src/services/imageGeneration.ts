@@ -5,10 +5,19 @@
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
+export const IMAGE_MODELS = {
+  'gemini-3-pro-image-preview': 'Nano Banana Pro',
+  'gemini-3.1-flash-image-preview': 'Nano Banana 2',
+} as const;
+
+export type ImageModelId = keyof typeof IMAGE_MODELS;
+
 export interface ImageGenerationParams {
   prompt: string;
   aspectRatio: '1:1' | '3:2' | '4:3' | '16:9' | '9:16' | '2:3' | '3:4' | '21:9' | '5:4' | '4:5';
   imageSize: '1K' | '2K' | '4K';
+  /** Model ID for LaoZhang API (default: gemini-3-pro-image-preview) */
+  model?: ImageModelId;
   /** Base64 data URLs - use when backend has high body limit (Heroku) or no ref URLs */
   referenceImages?: string[];
   /** Supabase public URLs - backend fetches these; avoids payload limits entirely */
@@ -82,6 +91,7 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
     aspectRatio: params.aspectRatio,
     imageSize: params.imageSize,
   };
+  if (params.model) body.model = params.model;
   if (params.referenceImageUrls?.length) {
     body.referenceImageUrls = params.referenceImageUrls;
   } else if (params.referenceImages?.length) {

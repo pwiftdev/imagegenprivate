@@ -2,7 +2,8 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { compressImageForReference, compressImageFromUrl } from '../utils/compressImage';
 import { enhancePrompt } from '../services/promptEnhancer';
 import { uploadReferenceImages } from '../services/imageStorage';
-import type { ImageGenerationParams } from '../services/imageGeneration';
+import type { ImageGenerationParams, ImageModelId } from '../services/imageGeneration';
+import { IMAGE_MODELS } from '../services/imageGeneration';
 
 interface ControlPanelProps {
   onGenerate?: (params: ImageGenerationParams, batchSize: number) => void;
@@ -18,6 +19,7 @@ interface ControlPanelProps {
 // Constants moved outside component to avoid recreation on every render
 const ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3', '5:4', '4:5'] as const;
 const QUALITIES = ['1K', '2K', '4K'] as const;
+const MODEL_IDS = Object.keys(IMAGE_MODELS) as ImageModelId[];
 const MAX_REFERENCE_IMAGES = 6;
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -35,8 +37,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [referenceImagesBase64, setReferenceImagesBase64] = useState<string[]>([]);
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<typeof ASPECT_RATIOS[number]>('3:2');
   const [selectedQuality, setSelectedQuality] = useState<typeof QUALITIES[number]>('1K');
+  const [selectedModel, setSelectedModel] = useState<ImageModelId>('gemini-3-pro-image-preview');
   const [batchSize, setBatchSize] = useState(1);
-  const [openPicker, setOpenPicker] = useState<'aspect' | 'quality' | null>(null);
+  const [openPicker, setOpenPicker] = useState<'aspect' | 'quality' | 'model' | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
   
@@ -187,6 +190,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       prompt,
       aspectRatio: selectedAspectRatio,
       imageSize: selectedQuality,
+      model: selectedModel,
     };
 
     if (referenceImagesBase64.length > 0) {
@@ -202,7 +206,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
 
     onGenerate(params, batchSize);
-  }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, referenceImagesBase64, batchSize]);
+  }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, selectedModel, referenceImagesBase64, batchSize]);
 
   return (
     <div className={`w-[96%] md:w-[50%] mb-8 px-1 md:px-4 ${className ?? ''}`}>
@@ -223,7 +227,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="info-bar-shimmer" />
             <div className="relative flex items-center justify-between gap-3">
               <p className="text-white/70 text-sm flex-1">
-              Describe your vision, add reference images, and pick an aspect ratio. Powered by Nano Banana Pro.
+              Describe your vision, add reference images, and pick an aspect ratio. Powered by {IMAGE_MODELS[selectedModel]}.
               </p>
               {onCloseMobile && (
                 <button
@@ -377,9 +381,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </button>
               </div>
 
-              {/* Model (locked) */}
-<div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl pl-3 pr-4 py-2 h-9 text-white text-sm">
-                <span>Nano Banana Pro</span>
+              {/* Model */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOpenPicker(openPicker === 'model' ? null : 'model')}
+                  className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 h-9 text-white text-sm cursor-pointer hover:bg-white/10 hover:border-blue-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                >
+                  <span>{IMAGE_MODELS[selectedModel]}</span>
+                  <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
               </div>
 
                 {/* Batch Size Select */}
@@ -431,38 +444,56 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-400/10 pointer-events-none" />
                   <div className="relative z-10 p-6">
                     <h3 className="text-white font-semibold mb-4">
-                      {openPicker === 'aspect' ? 'Choose aspect ratio' : 'Choose resolution'}
+                      {openPicker === 'aspect' && 'Choose aspect ratio'}
+                      {openPicker === 'quality' && 'Choose resolution'}
+                      {openPicker === 'model' && 'Choose AI model'}
                     </h3>
                     <div className="flex gap-2 flex-wrap">
-                      {openPicker === 'aspect'
-                        ? ASPECT_RATIOS.map((ratio) => (
-                            <button
-                              key={ratio}
-                              type="button"
-                              onClick={() => { setSelectedAspectRatio(ratio); setOpenPicker(null); }}
-                              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                                selectedAspectRatio === ratio
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
-                              }`}
-                            >
-                              {ratio}
-                            </button>
-                          ))
-                        : QUALITIES.map((quality) => (
-                            <button
-                              key={quality}
-                              type="button"
-                              onClick={() => { setSelectedQuality(quality); setOpenPicker(null); }}
-                              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                                selectedQuality === quality
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
-                              }`}
-                            >
-                              {quality}
-                            </button>
-                          ))}
+                      {openPicker === 'aspect' &&
+                        ASPECT_RATIOS.map((ratio) => (
+                          <button
+                            key={ratio}
+                            type="button"
+                            onClick={() => { setSelectedAspectRatio(ratio); setOpenPicker(null); }}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                              selectedAspectRatio === ratio
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
+                            }`}
+                          >
+                            {ratio}
+                          </button>
+                        ))}
+                      {openPicker === 'quality' &&
+                        QUALITIES.map((quality) => (
+                          <button
+                            key={quality}
+                            type="button"
+                            onClick={() => { setSelectedQuality(quality); setOpenPicker(null); }}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                              selectedQuality === quality
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
+                            }`}
+                          >
+                            {quality}
+                          </button>
+                        ))}
+                      {openPicker === 'model' &&
+                        MODEL_IDS.map((modelId) => (
+                          <button
+                            key={modelId}
+                            type="button"
+                            onClick={() => { setSelectedModel(modelId); setOpenPicker(null); }}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                              selectedModel === modelId
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
+                            }`}
+                          >
+                            {IMAGE_MODELS[modelId]}
+                          </button>
+                        ))}
                     </div>
                     <button
                       type="button"
