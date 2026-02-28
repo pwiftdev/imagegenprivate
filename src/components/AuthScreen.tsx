@@ -4,13 +4,14 @@ type Mode = 'signin' | 'signup';
 
 interface AuthScreenProps {
   onSignIn: (email: string, password: string) => Promise<void>;
-  onSignUp: (email: string, password: string) => Promise<void>;
+  onSignUp: (email: string, password: string, username?: string) => Promise<void>;
 }
 
 const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -23,10 +24,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
       setError('Please enter email and password');
       return;
     }
+    if (mode === 'signup' && !username.trim()) {
+      setError('Please enter a Kreator username');
+      return;
+    }
     setLoading(true);
     try {
       if (mode === 'signup') {
-        await onSignUp(email, password);
+        await onSignUp(email, password, username.trim());
         setMessage('Check your email to confirm your account.');
       } else {
         await onSignIn(email, password);
@@ -71,6 +76,20 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'signup' && (
+                <div>
+                  <label htmlFor="username" className="block text-white/80 text-sm mb-1.5">Kreator username</label>
+                  <input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
+                    placeholder="your_username"
+                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                  />
+                </div>
+              )}
               <div>
                 <label htmlFor="email" className="block text-white/80 text-sm mb-1.5">Email</label>
                 <input
@@ -125,7 +144,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
                   Don&apos;t have an account?{' '}
                   <button
                     type="button"
-                    onClick={() => { setMode('signup'); setError(null); setMessage(null); }}
+                    onClick={() => { setMode('signup'); setError(null); setMessage(null); setUsername(''); }}
                     className="text-blue-400 hover:text-blue-300 font-medium"
                   >
                     Sign up

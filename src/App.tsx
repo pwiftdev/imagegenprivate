@@ -222,7 +222,7 @@ function App() {
     return (
       <AuthScreen
         onSignIn={async (email, password) => { await signIn(email, password); }}
-        onSignUp={async (email, password) => { await signUp(email, password); }}
+        onSignUp={async (email, password, username) => { await signUp(email, password, username); }}
       />
     );
   }
