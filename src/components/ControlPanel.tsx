@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { compressImageForReference, compressImageFromUrl } from '../utils/compressImage';
+import { enhancePrompt } from '../services/promptEnhancer';
 import type { ImageGenerationParams } from '../services/imageGeneration';
 
 interface ControlPanelProps {
@@ -34,6 +35,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [selectedQuality, setSelectedQuality] = useState<typeof QUALITIES[number]>('1K');
   const [batchSize, setBatchSize] = useState(1);
   const [openPicker, setOpenPicker] = useState<'aspect' | 'quality' | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhanceError, setEnhanceError] = useState<string | null>(null);
   
   const objectUrlsRef = useRef<string[]>([]);
 
@@ -146,6 +149,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
   }, [addImagesFromFiles]);
+
+  const handleEnhanceClick = useCallback(async () => {
+    const text = prompt.trim();
+    if (!text) return;
+    setIsEnhancing(true);
+    setEnhanceError(null);
+    try {
+      const enhanced = await enhancePrompt(text);
+      setPrompt(enhanced);
+    } catch (err) {
+      setEnhanceError(err instanceof Error ? err.message : 'Failed to enhance prompt');
+    } finally {
+      setIsEnhancing(false);
+    }
+  }, [prompt]);
 
   const handleGenerateClick = useCallback(() => {
     if (!onGenerate) return;
@@ -263,12 +281,33 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
             {/* Prompt Input */}
             <div className="mb-4">
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Enter your prompt here..."
-                className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4 text-white placeholder-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 min-h-[100px] text-sm transition-all"
-              />
+              <div className="relative">
+                <textarea
+                  value={prompt}
+                  onChange={(e) => { setPrompt(e.target.value); setEnhanceError(null); }}
+                  placeholder="Enter your prompt here..."
+                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4 pr-28 text-white placeholder-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 min-h-[100px] text-sm transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={handleEnhanceClick}
+                  disabled={!prompt.trim() || isEnhancing}
+                  className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500/20"
+                  title="Enhance prompt with AI"
+                >
+                  {isEnhancing ? (
+                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-amber-400/50 border-t-amber-300" />
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  )}
+                  Kreate+
+                </button>
+              </div>
+              {enhanceError && (
+                <p className="mt-1.5 text-red-400/90 text-xs">{enhanceError}</p>
+              )}
             </div>
 
             {/* Settings Row */}
