@@ -12,10 +12,11 @@ import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupaba
 import { fetchProfilesByIds, fetchProfile } from './services/profileService';
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
+import { IMAGE_MODELS } from './services/imageGeneration';
 import './App.css';
 
 type GridItem =
-  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; creator?: CreatorInfo }
+  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface QueuedBatch {
@@ -117,6 +118,7 @@ function App() {
           const stored = img.storagePath
             ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize)
             : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize);
+          const modelLabel = batch.params.model ? IMAGE_MODELS[batch.params.model] : undefined;
           saved.push({
             type: 'image',
             id: stored.id,
@@ -124,10 +126,12 @@ function App() {
             aspectRatio: stored.aspect_ratio || img.aspectRatio,
             prompt: stored.prompt || img.prompt,
             imageSize: stored.image_size || img.imageSize,
+            model: modelLabel,
             creator: currentUserCreator ?? undefined,
           });
         } catch (saveErr) {
           console.error('Failed to save image to Supabase:', saveErr);
+          const modelLabel = batch.params.model ? IMAGE_MODELS[batch.params.model] : undefined;
           saved.push({
             type: 'image',
             id: img.id,
@@ -135,6 +139,7 @@ function App() {
             aspectRatio: img.aspectRatio,
             prompt: img.prompt,
             imageSize: img.imageSize,
+            model: modelLabel,
             creator: currentUserCreator ?? undefined,
           });
         }
@@ -382,6 +387,7 @@ function App() {
             prompt={item.prompt}
             aspectRatio={item.aspectRatio}
             imageSize={item.imageSize}
+            model={item.model}
             onClose={handleCloseModal}
             onReusePrompt={setPromptToInject}
           />

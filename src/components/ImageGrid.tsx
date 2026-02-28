@@ -4,7 +4,7 @@ import Masonry from '@mui/lab/Masonry';
 export type CreatorInfo = { username: string; avatar_url: string | null };
 
 export type ImageGridItem =
-  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; creator?: CreatorInfo }
+  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface ImageGridProps {

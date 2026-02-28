@@ -5,6 +5,7 @@ interface ImageModalProps {
   prompt?: string;
   aspectRatio?: string;
   imageSize?: string;
+  model?: string;
   onClose: () => void;
   onReusePrompt?: (prompt: string) => void;
 }
@@ -14,6 +15,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
   prompt,
   aspectRatio,
   imageSize,
+  model,
   onClose,
   onReusePrompt,
 }) => {
@@ -159,7 +161,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
               )}
 
               {/* Meta */}
-              <div className="flex gap-4 text-sm">
+              <div className="flex gap-4 text-sm flex-wrap">
                 {aspectRatio && (
                   <div>
                     <p className="text-white/50 text-xs mb-0.5">Ratio</p>
@@ -170,6 +172,12 @@ const ImageModal: React.FC<ImageModalProps> = ({
                   <div>
                     <p className="text-white/50 text-xs mb-0.5">Quality</p>
                     <p className="text-white font-medium">{imageSize}</p>
+                  </div>
+                )}
+                {model && (
+                  <div>
+                    <p className="text-white/50 text-xs mb-0.5">Model</p>
+                    <p className="text-white font-medium">{model}</p>
                   </div>
                 )}
               </div>
