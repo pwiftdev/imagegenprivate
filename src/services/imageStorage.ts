@@ -5,6 +5,58 @@
 import { supabase } from '../lib/supabase';
 
 const BUCKET_NAME = 'generated-images';
+const REFS_PATH_PREFIX = 'refs/';
+
+/**
+ * Upload reference image to Supabase Storage.
+ * Returns public URL - backend will fetch from this URL to avoid payload limits.
+ * Path: refs/{timestamp}-{random}.jpg (same bucket, separate path)
+ */
+export async function uploadReferenceImage(base64DataUrl: string): Promise<string> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const base64Clean = base64DataUrl.replace(/^data:image\/\w+;base64,/, '');
+  const ext = base64DataUrl.includes('image/png') ? 'png' : 'jpg';
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  const storagePath = REFS_PATH_PREFIX + fileName;
+
+  const byteCharacters = atob(base64Clean);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: ext === 'png' ? 'image/png' : 'image/jpeg' });
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET_NAME)
+    .upload(storagePath, blob, {
+      contentType: ext === 'png' ? 'image/png' : 'image/jpeg',
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Upload failed: ${uploadError.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
+  return urlData.publicUrl;
+}
+
+/**
+ * Upload multiple reference images to Supabase. Returns array of public URLs.
+ * Use these URLs with the backend to avoid hitting request body limits.
+ */
+export async function uploadReferenceImages(base64DataUrls: string[]): Promise<string[]> {
+  const urls: string[] = [];
+  for (const dataUrl of base64DataUrls) {
+    const url = await uploadReferenceImage(dataUrl);
+    urls.push(url);
+  }
+  return urls;
+}
 
 export interface StoredImage {
   id: string;

@@ -9,7 +9,10 @@ export interface ImageGenerationParams {
   prompt: string;
   aspectRatio: '1:1' | '3:2' | '4:3' | '16:9' | '9:16' | '2:3' | '3:4' | '21:9' | '5:4' | '4:5';
   imageSize: '1K' | '2K' | '4K';
+  /** Base64 data URLs - use when backend has high body limit (Heroku) or no ref URLs */
   referenceImages?: string[];
+  /** Supabase public URLs - backend fetches these; avoids payload limits entirely */
+  referenceImageUrls?: string[];
 }
 
 export interface GeneratedImage {
@@ -37,15 +40,21 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const body: Record<string, unknown> = {
+      prompt: params.prompt,
+      aspectRatio: params.aspectRatio,
+      imageSize: params.imageSize,
+    };
+    if (params.referenceImageUrls?.length) {
+      body.referenceImageUrls = params.referenceImageUrls;
+    } else if (params.referenceImages?.length) {
+      body.referenceImages = params.referenceImages;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: params.prompt,
-        aspectRatio: params.aspectRatio,
-        imageSize: params.imageSize,
-        referenceImages: params.referenceImages,
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json().catch(() => ({}));

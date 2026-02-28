@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { compressImageForReference, compressImageFromUrl } from '../utils/compressImage';
 import { enhancePrompt } from '../services/promptEnhancer';
+import { uploadReferenceImages } from '../services/imageStorage';
 import type { ImageGenerationParams } from '../services/imageGeneration';
 
 interface ControlPanelProps {
@@ -17,7 +18,7 @@ interface ControlPanelProps {
 // Constants moved outside component to avoid recreation on every render
 const ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3', '5:4', '4:5'] as const;
 const QUALITIES = ['1K', '2K', '4K'] as const;
-const MAX_REFERENCE_IMAGES = 6; // Keep under Vercel 4.5MB request body limit
+const MAX_REFERENCE_IMAGES = 6;
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
   onGenerate,
@@ -177,15 +178,28 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   }, [prompt]);
 
-  const handleGenerateClick = useCallback(() => {
+  const [isUploadingRefs, setIsUploadingRefs] = useState(false);
+
+  const handleGenerateClick = useCallback(async () => {
     if (!onGenerate) return;
 
-    const params: ImageGenerationParams = {
+    let params: ImageGenerationParams = {
       prompt,
       aspectRatio: selectedAspectRatio,
       imageSize: selectedQuality,
-      referenceImages: referenceImagesBase64.length > 0 ? referenceImagesBase64 : undefined
     };
+
+    if (referenceImagesBase64.length > 0) {
+      setIsUploadingRefs(true);
+      try {
+        const urls = await uploadReferenceImages(referenceImagesBase64);
+        params.referenceImageUrls = urls;
+      } catch {
+        params.referenceImages = referenceImagesBase64;
+      } finally {
+        setIsUploadingRefs(false);
+      }
+    }
 
     onGenerate(params, batchSize);
   }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, referenceImagesBase64, batchSize]);
@@ -387,11 +401,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
               {/* Generate Button */}
               <button
-                onClick={handleGenerateClick}
-                disabled={!prompt.trim()}
+                onClick={() => void handleGenerateClick()}
+                disabled={!prompt.trim() || isUploadingRefs}
                 className="ml-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
               >
-                {isGenerating ? (
+                {(isGenerating || isUploadingRefs) ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
                     <span>Kreating...</span>
