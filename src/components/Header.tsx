@@ -1,23 +1,42 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
   onSignOut: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ onSignOut }) => {
+  const location = useLocation();
+  const isProfile = location.pathname === '/profile';
+
   return (
     <header className="fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-6 bg-black/40 backdrop-blur-xl border-b border-white/10">
       {/* Logo / Brand */}
       <div className="flex items-center gap-3">
-        <img src="/kreatorlogo.png" alt="Kreator" className="h-8 w-auto rounded-xl" />
-        <span className="text-xl font-bold text-white tracking-tight">
-          Kreator
-        </span>
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/kreatorlogo.png" alt="Kreator" className="h-8 w-auto rounded-xl" />
+          <span className="text-xl font-bold text-white tracking-tight">
+            Kreator
+          </span>
+        </Link>
         <span className="text-white/40 text-sm hidden sm:inline italic">By Kreator, for creators.</span>
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-3">
+        <Link
+          to="/profile"
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border border-white/20 text-sm font-medium transition-all ${
+            isProfile
+              ? 'bg-blue-500/30 text-white border-blue-500/40'
+              : 'bg-white/10 hover:bg-white/15 text-white'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          My Kreator
+        </Link>
         <button
           onClick={onSignOut}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"

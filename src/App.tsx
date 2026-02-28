@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import ImageGrid from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
 import ImageModal from './components/ImageModal';
 import AuthScreen from './components/AuthScreen';
+import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { generateBatchImages } from './services/imageGeneration';
 import { saveImageToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
@@ -211,10 +213,12 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black pb-32 pt-14">
-      {/* Header */}
+    <>
       <Header onSignOut={signOut} />
-
+      <Routes>
+        <Route path="/profile" element={<ProfilePage user={user} />} />
+        <Route path="/" element={
+    <div className="min-h-screen bg-black pb-32 pt-14">
       {/* Error notification */}
       {error && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
@@ -373,6 +377,9 @@ function App() {
       })()}
 
     </div>
+        } />
+      </Routes>
+    </>
   );
 }
 
