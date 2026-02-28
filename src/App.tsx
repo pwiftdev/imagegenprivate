@@ -8,7 +8,7 @@ import AuthScreen from './components/AuthScreen';
 import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { generateBatchImages } from './services/imageGeneration';
-import { saveImageToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
+import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
 import { fetchProfilesByIds, fetchProfile } from './services/profileService';
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
@@ -114,12 +114,9 @@ function App() {
 
       for (const img of newImages) {
         try {
-          const stored = await saveImageToSupabase(
-            img.base64Data,
-            img.prompt,
-            img.aspectRatio,
-            img.imageSize
-          );
+          const stored = img.storagePath
+            ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize)
+            : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize);
           saved.push({
             type: 'image',
             id: stored.id,

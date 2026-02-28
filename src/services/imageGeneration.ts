@@ -18,6 +18,7 @@ export interface ImageGenerationParams {
 export interface GeneratedImage {
   id: string;
   url: string;
+  storagePath?: string;
   base64Data: string;
   timestamp: number;
   prompt: string;
@@ -60,20 +61,36 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
     const data = await response.json().catch(() => ({}));
 
     if (response.ok) {
-      const { base64Data, prompt, aspectRatio, imageSize } = data;
-      if (!base64Data) {
-        throw new Error('No image data returned');
+      const { url, storagePath, base64Data, prompt, aspectRatio, imageSize } = data;
+      const resolvedPrompt = prompt || params.prompt;
+      const resolvedAspect = aspectRatio || params.aspectRatio;
+      const resolvedSize = imageSize || params.imageSize;
+      if (url && storagePath) {
+        return {
+          id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          url,
+          storagePath,
+          base64Data: '',
+          timestamp: Date.now(),
+          prompt: resolvedPrompt,
+          aspectRatio: resolvedAspect,
+          imageSize: resolvedSize,
+        };
       }
-      const dataUrl = `data:image/png;base64,${base64Data}`;
-      return {
-        id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-        url: dataUrl,
-        base64Data,
-        timestamp: Date.now(),
-        prompt: prompt || params.prompt,
-        aspectRatio: aspectRatio || params.aspectRatio,
-        imageSize: imageSize || params.imageSize,
-      };
+      if (base64Data) {
+        const dataUrl = `data:image/png;base64,${base64Data}`;
+        return {
+          id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          url: dataUrl,
+          storagePath: undefined,
+          base64Data,
+          timestamp: Date.now(),
+          prompt: resolvedPrompt,
+          aspectRatio: resolvedAspect,
+          imageSize: resolvedSize,
+        };
+      }
+      throw new Error('No image data returned');
     }
 
     lastError = new Error(data.error || `Generation failed: ${response.status}`);

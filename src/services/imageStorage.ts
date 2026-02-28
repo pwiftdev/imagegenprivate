@@ -142,6 +142,48 @@ export async function saveImageToSupabase(
   };
 }
 
+/**
+ * Save metadata only - image already in Supabase Storage (uploaded by backend)
+ */
+export async function saveImageMetadataToSupabase(
+  storagePath: string,
+  prompt: string,
+  aspectRatio: string,
+  imageSize: string
+): Promise<StoredImage> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
+  const publicUrl = urlData.publicUrl;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const insertPayload: Record<string, unknown> = {
+    prompt,
+    aspect_ratio: aspectRatio,
+    image_size: imageSize,
+    storage_path: storagePath,
+    file_name: storagePath,
+  };
+  if (user?.id) insertPayload.user_id = user.id;
+
+  const { data: row, error: dbError } = await supabase
+    .from('images')
+    .insert(insertPayload)
+    .select()
+    .single();
+
+  if (dbError) {
+    throw new Error(`Database error: ${dbError.message}`);
+  }
+
+  return {
+    ...row,
+    url: publicUrl
+  };
+}
+
 export type ImageScope = 'mine' | 'all';
 
 /**
