@@ -15,6 +15,26 @@ export interface Profile {
 const AVATARS_BUCKET = 'generated-images';
 const AVATARS_PATH_PREFIX = 'avatars/';
 
+export async function fetchProfilesByIds(userIds: string[]): Promise<Map<string, { username: string; avatar_url: string | null }>> {
+  const map = new Map<string, { username: string; avatar_url: string | null }>();
+  if (!supabase || userIds.length === 0) return map;
+
+  const unique = [...new Set(userIds.filter(Boolean))];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', unique);
+
+  if (error) return map;
+  for (const p of data || []) {
+    map.set(p.id, {
+      username: p.username || 'Creator',
+      avatar_url: p.avatar_url,
+    });
+  }
+  return map;
+}
+
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   if (!supabase) return null;
 

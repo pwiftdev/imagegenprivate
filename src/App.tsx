@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import ImageGrid from './components/ImageGrid';
+import ImageGrid, { type CreatorInfo } from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
 import ImageModal from './components/ImageModal';
@@ -9,12 +9,13 @@ import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { generateBatchImages } from './services/imageGeneration';
 import { saveImageToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
+import { fetchProfilesByIds, fetchProfile } from './services/profileService';
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import './App.css';
 
 type GridItem =
-  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string }
+  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface QueuedBatch {
@@ -42,6 +43,15 @@ function App() {
   const [referenceImageUrlToInject, setReferenceImageUrlToInject] = useState<string | null>(null);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
+  const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
+
+  // Load current user's creator info (for newly generated images)
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchProfile(user.id).then((p) => {
+      if (p) setCurrentUserCreator({ username: p.username || 'Creator', avatar_url: p.avatar_url });
+    });
+  }, [user?.id]);
 
   // Load images from Supabase (refetch when viewMode changes)
   useEffect(() => {
@@ -50,6 +60,8 @@ function App() {
       setIsLoading(true);
       try {
         const stored = await fetchImagesFromSupabase(viewMode);
+        const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
+        const creatorMap = await fetchProfilesByIds(userIds);
         const newImages: GridItem[] = stored
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .map((img) => ({
@@ -58,7 +70,8 @@ function App() {
             url: img.url,
             aspectRatio: img.aspect_ratio || '',
             prompt: img.prompt || '',
-            imageSize: img.image_size || ''
+            imageSize: img.image_size || '',
+            creator: img.user_id ? creatorMap.get(img.user_id) : undefined,
           }));
         setGridItems((prev) => {
           const placeholders = prev.filter((item): item is Extract<GridItem, { type: 'placeholder' }> => item.type === 'placeholder');
@@ -113,7 +126,8 @@ function App() {
             url: stored.url,
             aspectRatio: stored.aspect_ratio || img.aspectRatio,
             prompt: stored.prompt || img.prompt,
-            imageSize: stored.image_size || img.imageSize
+            imageSize: stored.image_size || img.imageSize,
+            creator: currentUserCreator ?? undefined,
           });
         } catch (saveErr) {
           console.error('Failed to save image to Supabase:', saveErr);
@@ -123,7 +137,8 @@ function App() {
             url: img.url,
             aspectRatio: img.aspectRatio,
             prompt: img.prompt,
-            imageSize: img.imageSize
+            imageSize: img.imageSize,
+            creator: currentUserCreator ?? undefined,
           });
         }
       }
@@ -141,7 +156,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [isProcessing]);
+  }, [isProcessing, currentUserCreator]);
 
   useEffect(() => {
     if (queue.length > 0 && !isProcessing) {

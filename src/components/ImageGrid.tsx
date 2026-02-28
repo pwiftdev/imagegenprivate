@@ -1,8 +1,10 @@
 import React, { memo } from 'react';
 import Masonry from '@mui/lab/Masonry';
 
+export type CreatorInfo = { username: string; avatar_url: string | null };
+
 export type ImageGridItem =
-  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string }
+  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface ImageGridProps {
@@ -79,6 +81,24 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onCopyP
                 target.src = `https://via.placeholder.com/400x400/1a1a1a/666666?text=Image+${index + 1}`;
               }}
             />
+            {item.creator && (
+              <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-sm rounded-full px-1.5 py-0.5 max-w-[90%]">
+                {item.creator.avatar_url ? (
+                  <img
+                    src={item.creator.avatar_url}
+                    alt=""
+                    className="w-4 h-4 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                <span className="text-[10px] text-white/90 truncate font-medium">{item.creator.username}</span>
+              </div>
+            )}
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
               <button
                 onClick={(e) => { e.stopPropagation(); onImageClick?.(index); }}
