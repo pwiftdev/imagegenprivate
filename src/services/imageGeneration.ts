@@ -27,32 +27,69 @@ export interface GeneratedImage {
 }
 
 const MAX_RETRIES = 3;
+const POLL_INTERVAL_MS = 1500;
+const POLL_TIMEOUT_MS = 5 * 60 * 1000; // 5 min max
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function parseResult(
+  data: { url?: string; storagePath?: string; base64Data?: string; prompt?: string; aspectRatio?: string; imageSize?: string },
+  params: ImageGenerationParams
+): GeneratedImage {
+  const resolvedPrompt = data.prompt || params.prompt;
+  const resolvedAspect = data.aspectRatio || params.aspectRatio;
+  const resolvedSize = data.imageSize || params.imageSize;
+  if (data.url && data.storagePath) {
+    return {
+      id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      url: data.url,
+      storagePath: data.storagePath,
+      base64Data: '',
+      timestamp: Date.now(),
+      prompt: resolvedPrompt,
+      aspectRatio: resolvedAspect,
+      imageSize: resolvedSize,
+    };
+  }
+  if (data.base64Data) {
+    return {
+      id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      url: `data:image/png;base64,${data.base64Data}`,
+      storagePath: undefined,
+      base64Data: data.base64Data,
+      timestamp: Date.now(),
+      prompt: resolvedPrompt,
+      aspectRatio: resolvedAspect,
+      imageSize: resolvedSize,
+    };
+  }
+  throw new Error('No image data returned');
+}
+
 /**
  * Generate one image via our API proxy (key stays on server)
- * Retries on 429/503 with exponential backoff
+ * Uses async job flow: POST returns 202 + jobId, then polls for result (avoids Heroku 30s timeout)
+ * Retries POST on 429/503 with exponential backoff
  */
 export async function generateImage(params: ImageGenerationParams): Promise<GeneratedImage> {
-  const url = `${API_BASE}/api/generate`;
+  const postUrl = `${API_BASE}/api/generate`;
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const body: Record<string, unknown> = {
-      prompt: params.prompt,
-      aspectRatio: params.aspectRatio,
-      imageSize: params.imageSize,
-    };
-    if (params.referenceImageUrls?.length) {
-      body.referenceImageUrls = params.referenceImageUrls;
-    } else if (params.referenceImages?.length) {
-      body.referenceImages = params.referenceImages;
-    }
+  const body: Record<string, unknown> = {
+    prompt: params.prompt,
+    aspectRatio: params.aspectRatio,
+    imageSize: params.imageSize,
+  };
+  if (params.referenceImageUrls?.length) {
+    body.referenceImageUrls = params.referenceImageUrls;
+  } else if (params.referenceImages?.length) {
+    body.referenceImages = params.referenceImages;
+  }
 
-    const response = await fetch(url, {
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const response = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -60,37 +97,29 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
 
     const data = await response.json().catch(() => ({}));
 
-    if (response.ok) {
-      const { url, storagePath, base64Data, prompt, aspectRatio, imageSize } = data;
-      const resolvedPrompt = prompt || params.prompt;
-      const resolvedAspect = aspectRatio || params.aspectRatio;
-      const resolvedSize = imageSize || params.imageSize;
-      if (url && storagePath) {
-        return {
-          id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-          url,
-          storagePath,
-          base64Data: '',
-          timestamp: Date.now(),
-          prompt: resolvedPrompt,
-          aspectRatio: resolvedAspect,
-          imageSize: resolvedSize,
-        };
+    // Async flow: 202 + jobId → poll for result
+    if (response.status === 202 && data.jobId) {
+      const statusUrl = `${API_BASE}/api/generate/status/${data.jobId}`;
+      const start = Date.now();
+      for (;;) {
+        await sleep(POLL_INTERVAL_MS);
+        if (Date.now() - start > POLL_TIMEOUT_MS) {
+          throw new Error('Generation timed out');
+        }
+        const statusRes = await fetch(statusUrl);
+        const statusData = await statusRes.json().catch(() => ({}));
+        if (statusRes.status === 500 && statusData.error) {
+          throw new Error(statusData.error);
+        }
+        if (statusRes.ok && (statusData.url || statusData.base64Data)) {
+          return parseResult(statusData, params);
+        }
       }
-      if (base64Data) {
-        const dataUrl = `data:image/png;base64,${base64Data}`;
-        return {
-          id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-          url: dataUrl,
-          storagePath: undefined,
-          base64Data,
-          timestamp: Date.now(),
-          prompt: resolvedPrompt,
-          aspectRatio: resolvedAspect,
-          imageSize: resolvedSize,
-        };
-      }
-      throw new Error('No image data returned');
+    }
+
+    // Sync fallback: 200 with image data (legacy)
+    if (response.ok && (data.url || data.base64Data)) {
+      return parseResult(data, params);
     }
 
     lastError = new Error(data.error || `Generation failed: ${response.status}`);
