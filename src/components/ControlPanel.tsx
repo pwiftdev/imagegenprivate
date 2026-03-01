@@ -12,6 +12,8 @@ interface ControlPanelProps {
   onPromptInjected?: () => void;
   referenceImageUrlToInject?: string | null;
   onReferenceImageInjected?: () => void;
+  referenceImageUrlsToInject?: string[] | null;
+  onReferenceImagesInjected?: () => void;
   onCloseMobile?: () => void;
   className?: string;
 }
@@ -29,6 +31,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onPromptInjected,
   referenceImageUrlToInject,
   onReferenceImageInjected,
+  referenceImageUrlsToInject,
+  onReferenceImagesInjected,
   onCloseMobile,
   className,
 }) => {
@@ -82,6 +86,30 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       }
     })();
   }, [referenceImageUrlToInject, onReferenceImageInjected]);
+
+  useEffect(() => {
+    if (!referenceImageUrlsToInject?.length || !onReferenceImagesInjected) return;
+    (async () => {
+      const urls = referenceImageUrlsToInject;
+      onReferenceImagesInjected();
+      for (const url of urls) {
+        if (typeof url !== 'string' || !url.startsWith('http')) continue;
+        try {
+          const base64 = await compressImageFromUrl(url);
+          setReferenceImages(prev => {
+            if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
+            return [...prev, url];
+          });
+          setReferenceImagesBase64(prev => {
+            if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
+            return [...prev, base64];
+          });
+        } catch (err) {
+          console.error('Failed to add reference image from Re-run:', err);
+        }
+      }
+    })();
+  }, [referenceImageUrlsToInject, onReferenceImagesInjected]);
 
   // Cleanup object URLs when component unmounts
   useEffect(() => {

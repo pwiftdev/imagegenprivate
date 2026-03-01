@@ -67,6 +67,7 @@ export interface StoredImage {
   image_size: string | null;
   storage_path: string;
   file_name: string | null;
+  reference_image_urls?: string[] | null;
   url: string; // Public URL for display
 }
 
@@ -77,7 +78,8 @@ export async function saveImageToSupabase(
   base64Data: string,
   prompt: string,
   aspectRatio: string,
-  imageSize: string
+  imageSize: string,
+  referenceImageUrls?: string[]
 ): Promise<StoredImage> {
   if (!supabase) {
     throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env');
@@ -124,6 +126,9 @@ export async function saveImageToSupabase(
     file_name: fileName
   };
   if (user?.id) insertPayload.user_id = user.id;
+  if (referenceImageUrls && referenceImageUrls.length > 0) {
+    insertPayload.reference_image_urls = referenceImageUrls;
+  }
 
   // Insert metadata
   const { data: row, error: dbError } = await supabase
@@ -149,7 +154,8 @@ export async function saveImageMetadataToSupabase(
   storagePath: string,
   prompt: string,
   aspectRatio: string,
-  imageSize: string
+  imageSize: string,
+  referenceImageUrls?: string[]
 ): Promise<StoredImage> {
   if (!supabase) {
     throw new Error('Supabase is not configured');
@@ -167,6 +173,9 @@ export async function saveImageMetadataToSupabase(
     file_name: storagePath,
   };
   if (user?.id) insertPayload.user_id = user.id;
+  if (referenceImageUrls && referenceImageUrls.length > 0) {
+    insertPayload.reference_image_urls = referenceImageUrls;
+  }
 
   const { data: row, error: dbError } = await supabase
     .from('images')
@@ -195,17 +204,36 @@ export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promi
     return [];
   }
 
+  const baseSelect = 'id, created_at, user_id, prompt, aspect_ratio, image_size, storage_path, file_name';
+  let rows: Record<string, unknown>[] | null = null;
+  let error: Error | null = null;
+
+  // Try with reference_image_urls first (requires migration)
   let query = supabase
     .from('images')
-    .select('id, created_at, user_id, prompt, aspect_ratio, image_size, storage_path, file_name')
+    .select(`${baseSelect}, reference_image_urls`)
     .order('created_at', { ascending: false });
-
   if (scope === 'mine') {
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.id) query = query.eq('user_id', user.id);
   }
-
-  const { data: rows, error } = await query;
+  const result1 = await query;
+  if (!result1.error) {
+    rows = (result1.data ?? null) as Record<string, unknown>[] | null;
+  } else {
+    // Fallback: column may not exist yet
+    let query2 = supabase
+      .from('images')
+      .select(baseSelect)
+      .order('created_at', { ascending: false });
+    if (scope === 'mine') {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) query2 = query2.eq('user_id', user.id);
+    }
+    const result2 = await query2;
+    rows = (result2.data ?? null) as Record<string, unknown>[] | null;
+    error = result2.error as Error | null;
+  }
 
   if (error) {
     console.error('Failed to fetch images:', error);
@@ -221,14 +249,15 @@ export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promi
 
   // Build public URLs for each image
   return (rows || []).map((row) => {
+    const r = row as { storage_path: string; [k: string]: unknown };
     const { data: urlData } = client.storage
       .from(BUCKET_NAME)
-      .getPublicUrl(row.storage_path);
+      .getPublicUrl(r.storage_path);
 
     return {
-      ...row,
+      ...r,
       url: urlData.publicUrl
-    };
+    } as StoredImage;
   });
 }
 

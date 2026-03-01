@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 
 interface ImageModalProps {
   imageUrl: string;
@@ -8,7 +8,15 @@ interface ImageModalProps {
   model?: string;
   onClose: () => void;
   onReusePrompt?: (prompt: string) => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
 }
+
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 0.25;
 
 const ImageModal: React.FC<ImageModalProps> = ({
   imageUrl,
@@ -18,14 +26,98 @@ const ImageModal: React.FC<ImageModalProps> = ({
   model,
   onClose,
   onReusePrompt,
+  onPrev,
+  onNext,
+  hasPrev = false,
+  hasNext = false,
 }) => {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const zoomIn = useCallback(() => {
+    setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP));
+    setPan({ x: 0, y: 0 }); // recenter on zoom
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_STEP));
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY < 0) zoomIn();
+      else zoomOut();
+    },
+    [zoomIn, zoomOut]
+  );
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (zoom <= 1) return;
+      e.preventDefault();
+      setIsDragging(true);
+      dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+    },
+    [zoom, pan]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPan({ x: dragStart.current.panX + dx, y: dragStart.current.panY + dy });
+    },
+    [isDragging]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'grabbing';
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [imageUrl]);
+
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && hasPrev && onPrev) {
+        e.preventDefault();
+        onPrev();
+      }
+      if (e.key === 'ArrowRight' && hasNext && onNext) {
+        e.preventDefault();
+        onNext();
+      }
+    };
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [onClose, onPrev, onNext, hasPrev, hasNext]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -96,29 +188,89 @@ const ImageModal: React.FC<ImageModalProps> = ({
   const isShareSupported =
     typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
+  const canPan = zoom > 1;
+
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-2 md:p-4"
+      className="fixed inset-0 z-[100] flex bg-black/95 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* Desktop: full-screen layout - image fills viewport, sidebar on right */}
       <div
-        className="relative flex flex-col md:flex-row max-w-5xl w-full max-h-[90vh] bg-black/60 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden shadow-2xl"
+        className="flex flex-col md:flex-row w-full h-full overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Scrollable content - mobile: 1 col stack, desktop: side by side */}
-        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto">
-          {/* 1. Image */}
-          <div className="relative flex-shrink-0 flex items-center justify-center min-w-0 p-4 md:flex-1 md:p-6">
-            <img
-              src={imageUrl}
-              alt="Generated image"
-              className="max-w-full max-h-[50vh] md:max-h-[80vh] object-contain rounded-lg"
-            />
-            {/* Close button - overlaps image, same border radius */}
+        {/* Image area - full size on desktop */}
+        <div
+          ref={containerRef}
+          className={`relative flex-1 flex items-center justify-center min-h-0 overflow-hidden ${
+            canPan ? 'cursor-grab' : ''
+          } ${isDragging ? 'cursor-grabbing' : ''}`}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onDoubleClick={resetView}
+          style={{ touchAction: 'none' }}
+        >
+          <img
+            src={imageUrl}
+            alt="Generated image"
+            className="max-w-full max-h-full object-contain select-none pointer-events-none md:max-w-none md:max-h-full"
+            style={{
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+            }}
+            draggable={false}
+          />
+
+          {/* Prev / Next arrows - sides of image area */}
+          {hasPrev && onPrev && (
             <button
-              onClick={onClose}
-              className="absolute top-4 right-4 md:top-6 md:right-6 z-20 flex items-center justify-center w-9 h-9 rounded-lg bg-black/60 hover:bg-black/80 text-white/90 hover:text-white transition-all"
-              aria-label="Close"
+              onClick={onPrev}
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-12 h-12 rounded-xl bg-black/60 hover:bg-black/80 text-white/90 hover:text-white transition-all backdrop-blur-sm border border-white/20"
+              aria-label="Previous (newer)"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+          {hasNext && onNext && (
+            <button
+              onClick={onNext}
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-12 h-12 rounded-xl bg-black/60 hover:bg-black/80 text-white/90 hover:text-white transition-all backdrop-blur-sm border border-white/20"
+              aria-label="Next (older)"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+
+          {/* Zoom controls - bottom left on desktop */}
+          <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-xl bg-black/60 backdrop-blur-sm p-1.5 border border-white/10">
+            <button
+              onClick={zoomOut}
+              disabled={zoom <= MIN_ZOOM}
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              aria-label="Zoom out"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </button>
+            <span className="text-white/90 text-sm min-w-[3ch] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={zoomIn}
+              disabled={zoom >= MAX_ZOOM}
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              aria-label="Zoom in"
             >
               <svg
                 className="w-5 h-5"
@@ -130,62 +282,100 @@ const ImageModal: React.FC<ImageModalProps> = ({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={resetView}
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-white hover:bg-white/10 transition-all"
+              aria-label="Reset view"
+              title="Reset zoom"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
                 />
               </svg>
             </button>
           </div>
+        </div>
 
-          {/* 2. Info + 3. Buttons - desktop: sidebar | mobile: stacked below image */}
-          <div className="flex flex-col md:w-80 md:flex-shrink-0 md:border-l md:border-white/10">
-            {/* Info */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
-              {/* Branding */}
-              <div>
-                <img
-                  src="/kreatorlogo.png"
-                  alt="Kreator"
-                  className="h-8 w-auto rounded-lg mb-2"
-                />
-                <p className="text-white/50 text-xs italic">By Kreator, for creators.</p>
-              </div>
-
-              {/* Prompt */}
-              {prompt && (
-                <div>
-                  <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1">
-                    Prompt
-                  </p>
-                  <p className="text-white/90 text-sm leading-relaxed">{prompt}</p>
-                </div>
-              )}
-
-              {/* Meta */}
-              <div className="flex gap-4 text-sm flex-wrap">
-                {aspectRatio && (
-                  <div>
-                    <p className="text-white/50 text-xs mb-0.5">Ratio</p>
-                    <p className="text-white font-medium">{aspectRatio}</p>
-                  </div>
-                )}
-                {imageSize && (
-                  <div>
-                    <p className="text-white/50 text-xs mb-0.5">Quality</p>
-                    <p className="text-white font-medium">{imageSize}</p>
-                  </div>
-                )}
-                {model && (
-                  <div>
-                    <p className="text-white/50 text-xs mb-0.5">Model</p>
-                    <p className="text-white font-medium">{model}</p>
-                  </div>
-                )}
-              </div>
+        {/* Sidebar - desktop: overlay/slide from right | mobile: stacked below */}
+        <div className="flex flex-col w-full md:w-80 md:max-w-[90vw] md:min-w-[280px] bg-black/80 md:bg-black/60 backdrop-blur-xl md:border-l md:border-white/10 overflow-y-auto max-h-[50vh] md:max-h-full">
+          <div className="flex-1 p-4 md:p-6 space-y-4 md:space-y-6">
+            {/* Close - prominent at top of sidebar */}
+            <div className="flex justify-end -mt-1 mb-2">
+              <button
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 w-12 h-12 rounded-xl bg-white/15 hover:bg-white/25 text-white font-medium border border-white/30 hover:border-white/50 transition-all shadow-lg"
+                aria-label="Close"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div>
+              <img
+                src="/kreatorlogo.png"
+                alt="Kreator"
+                className="h-8 w-auto rounded-lg mb-2"
+              />
+              <p className="text-white/50 text-xs italic">By Kreator, for creators.</p>
             </div>
 
-            {/* Actions */}
-            <div className="flex-shrink-0 p-4 border-t border-white/10 space-y-2">
-              <div className="flex gap-2">
+            {prompt && (
+              <div>
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1">
+                  Prompt
+                </p>
+                <p className="text-white/90 text-sm leading-relaxed">{prompt}</p>
+              </div>
+            )}
+
+            <div className="flex gap-4 text-sm flex-wrap">
+              {aspectRatio && (
+                <div>
+                  <p className="text-white/50 text-xs mb-0.5">Ratio</p>
+                  <p className="text-white font-medium">{aspectRatio}</p>
+                </div>
+              )}
+              {imageSize && (
+                <div>
+                  <p className="text-white/50 text-xs mb-0.5">Quality</p>
+                  <p className="text-white font-medium">{imageSize}</p>
+                </div>
+              )}
+              {model && (
+                <div>
+                  <p className="text-white/50 text-xs mb-0.5">Model</p>
+                  <p className="text-white font-medium">{model}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-shrink-0 p-4 border-t border-white/10 space-y-2">
+            <div className="flex gap-2">
               <button
                 onClick={handleDownload}
                 className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -224,8 +414,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Copy
               </button>
-              </div>
-              {isShareSupported && (
+            </div>
+            {isShareSupported && (
               <button
                 onClick={handleShare}
                 className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -245,8 +435,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Share
               </button>
-              )}
-              {prompt?.trim() && onReusePrompt && (
+            )}
+            {prompt?.trim() && onReusePrompt && (
               <button
                 onClick={handleReusePrompt}
                 className="w-full flex items-center justify-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -266,14 +456,13 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Reuse prompt
               </button>
-              )}
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs hidden md:block">
-        Press <kbd className="px-2 py-0.5 bg-white/10 rounded">ESC</kbd> to close
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs hidden md:block pointer-events-none">
+        <kbd className="px-2 py-0.5 bg-white/10 rounded">ESC</kbd> close · <kbd className="px-2 py-0.5 bg-white/10 rounded">←</kbd><kbd className="px-2 py-0.5 bg-white/10 rounded">→</kbd> navigate · Scroll zoom · Drag when zoomed
       </p>
     </div>
   );

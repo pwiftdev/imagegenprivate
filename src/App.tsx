@@ -16,7 +16,7 @@ import { IMAGE_MODELS } from './services/imageGeneration';
 import './App.css';
 
 type GridItem =
-  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; creator?: CreatorInfo }
+  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface QueuedBatch {
@@ -42,8 +42,8 @@ function App() {
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
   const [promptToInject, setPromptToInject] = useState<string | null>(null);
   const [referenceImageUrlToInject, setReferenceImageUrlToInject] = useState<string | null>(null);
+  const [referenceImageUrlsToInject, setReferenceImageUrlsToInject] = useState<string[] | null>(null);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
-  const [copiedFeedback, setCopiedFeedback] = useState(false);
   const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
 
   // Load current user's creator info (for newly generated images)
@@ -72,6 +72,7 @@ function App() {
             aspectRatio: img.aspect_ratio || '',
             prompt: img.prompt || '',
             imageSize: img.image_size || '',
+            referenceImageUrls: Array.isArray(img.reference_image_urls) ? img.reference_image_urls : undefined,
             creator: img.user_id ? creatorMap.get(img.user_id) : undefined,
           }));
         setGridItems((prev) => {
@@ -113,11 +114,12 @@ function App() {
       const newImages = await generateBatchImages(batch.params, batch.batchSize);
       const saved: GridItem[] = [];
 
+      const refUrls = batch.params.referenceImageUrls?.filter((u): u is string => !!u);
       for (const img of newImages) {
         try {
           const stored = img.storagePath
-            ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize)
-            : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize);
+            ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls)
+            : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls);
           const modelLabel = batch.params.model ? IMAGE_MODELS[batch.params.model] : undefined;
           saved.push({
             type: 'image',
@@ -127,6 +129,7 @@ function App() {
             prompt: stored.prompt || img.prompt,
             imageSize: stored.image_size || img.imageSize,
             model: modelLabel,
+            referenceImageUrls: refUrls,
             creator: currentUserCreator ?? undefined,
           });
         } catch (saveErr) {
@@ -140,6 +143,7 @@ function App() {
             prompt: img.prompt,
             imageSize: img.imageSize,
             model: modelLabel,
+            referenceImageUrls: refUrls,
             creator: currentUserCreator ?? undefined,
           });
         }
@@ -207,9 +211,19 @@ function App() {
     setControlPanelOpen(true);
   }, []);
 
-  const handleCopyPrompt = useCallback((_prompt: string) => {
-    setCopiedFeedback(true);
-    setTimeout(() => setCopiedFeedback(false), 2000);
+  const handleReferenceImagesInjected = useCallback(() => {
+    setReferenceImageUrlsToInject(null);
+    setControlPanelOpen(true);
+  }, []);
+
+  const handleReRun = useCallback((prompt: string, referenceImageUrls?: string[]) => {
+    setPromptToInject(prompt);
+    if (referenceImageUrls && referenceImageUrls.length > 0) {
+      setReferenceImageUrlsToInject(referenceImageUrls);
+    } else {
+      setReferenceImageUrlsToInject(null);
+    }
+    setControlPanelOpen(true);
   }, []);
 
   if (authLoading) {
@@ -250,15 +264,6 @@ function App() {
             >
               ×
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Copied toast */}
-      {copiedFeedback && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="bg-white/20 backdrop-blur-xl border border-white/30 text-white px-4 py-2 rounded-lg text-sm">
-            Copied to clipboard!
           </div>
         </div>
       )}
@@ -337,7 +342,7 @@ function App() {
             <ImageGrid
               items={filteredItems}
               onImageClick={handleImageClick}
-              onCopyPrompt={handleCopyPrompt}
+              onReRun={handleReRun}
               onAddToReference={(url) => { setReferenceImageUrlToInject(url); setControlPanelOpen(true); }}
             />
           );
@@ -368,6 +373,8 @@ function App() {
             onPromptInjected={handlePromptInjected}
             referenceImageUrlToInject={referenceImageUrlToInject}
             onReferenceImageInjected={handleReferenceImageInjected}
+            referenceImageUrlsToInject={referenceImageUrlsToInject}
+            onReferenceImagesInjected={handleReferenceImagesInjected}
             onCloseMobile={() => setControlPanelOpen(false)}
             className="pointer-events-auto"
           />
@@ -381,6 +388,22 @@ function App() {
           : gridItems.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
         const item = filteredItems[selectedImageIndex];
         if (!item || item.type !== 'image') return null;
+        const imageItems = filteredItems.filter((i): i is Extract<typeof i, { type: 'image' }> => i.type === 'image');
+        const currentImageIdx = imageItems.findIndex((i) => i.id === item.id);
+        const hasPrev = currentImageIdx > 0;
+        const hasNext = currentImageIdx >= 0 && currentImageIdx < imageItems.length - 1;
+        const onPrev = () => {
+          if (currentImageIdx <= 0) return;
+          const prevItem = imageItems[currentImageIdx - 1];
+          const idx = filteredItems.findIndex((i) => i.type === 'image' && i.id === prevItem.id);
+          if (idx >= 0) setSelectedImageIndex(idx);
+        };
+        const onNext = () => {
+          if (currentImageIdx < 0 || currentImageIdx >= imageItems.length - 1) return;
+          const nextItem = imageItems[currentImageIdx + 1];
+          const idx = filteredItems.findIndex((i) => i.type === 'image' && i.id === nextItem.id);
+          if (idx >= 0) setSelectedImageIndex(idx);
+        };
         return (
           <ImageModal
             imageUrl={item.url}
@@ -390,6 +413,10 @@ function App() {
             model={item.model}
             onClose={handleCloseModal}
             onReusePrompt={setPromptToInject}
+            onPrev={onPrev}
+            onNext={onNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
           />
         );
       })()}
