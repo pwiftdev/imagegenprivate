@@ -18,6 +18,8 @@ export interface ImageGenerationParams {
   imageSize: '1K' | '2K' | '4K';
   /** Model ID for LaoZhang API (default: gemini-3-pro-image-preview) */
   model?: ImageModelId;
+  /** User ID for backend metadata save (survives reload) */
+  userId?: string;
   /** Base64 data URLs - use when backend has high body limit (Heroku) or no ref URLs */
   referenceImages?: string[];
   /** Supabase public URLs - backend fetches these; avoids payload limits entirely */
@@ -38,13 +40,41 @@ export interface GeneratedImage {
 const MAX_RETRIES = 3;
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000; // 5 min max
+const ACTIVE_JOBS_KEY = 'kreator-active-job-ids';
+
+export function addActiveJob(jobId: string): void {
+  try {
+    const ids = JSON.parse(localStorage.getItem(ACTIVE_JOBS_KEY) || '[]') as string[];
+    if (!ids.includes(jobId)) ids.push(jobId);
+    localStorage.setItem(ACTIVE_JOBS_KEY, JSON.stringify(ids));
+  } catch {
+    // ignore
+  }
+}
+
+export function removeActiveJob(jobId: string): void {
+  try {
+    const ids = (JSON.parse(localStorage.getItem(ACTIVE_JOBS_KEY) || '[]') as string[]).filter((id) => id !== jobId);
+    localStorage.setItem(ACTIVE_JOBS_KEY, JSON.stringify(ids));
+  } catch {
+    // ignore
+  }
+}
+
+export function getActiveJobIds(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(ACTIVE_JOBS_KEY) || '[]') as string[];
+  } catch {
+    return [];
+  }
+}
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 function parseResult(
-  data: { url?: string; storagePath?: string; base64Data?: string; prompt?: string; aspectRatio?: string; imageSize?: string },
+  data: { id?: string; url?: string; storagePath?: string; base64Data?: string; prompt?: string; aspectRatio?: string; imageSize?: string },
   params: ImageGenerationParams
 ): GeneratedImage {
   const resolvedPrompt = data.prompt || params.prompt;
@@ -52,7 +82,7 @@ function parseResult(
   const resolvedSize = data.imageSize || params.imageSize;
   if (data.url && data.storagePath) {
     return {
-      id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id: data.id || `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       url: data.url,
       storagePath: data.storagePath,
       base64Data: '',
@@ -92,6 +122,7 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
     imageSize: params.imageSize,
   };
   if (params.model) body.model = params.model;
+  if (params.userId) body.userId = params.userId;
   if (params.referenceImageUrls?.length) {
     body.referenceImageUrls = params.referenceImageUrls;
   } else if (params.referenceImages?.length) {
@@ -109,21 +140,27 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
 
     // Async flow: 202 + jobId → poll for result
     if (response.status === 202 && data.jobId) {
-      const statusUrl = `${API_BASE}/api/generate/status/${data.jobId}`;
+      const jobId = data.jobId as string;
+      addActiveJob(jobId);
+      const statusUrl = `${API_BASE}/api/generate/status/${jobId}`;
       const start = Date.now();
-      for (;;) {
-        await sleep(POLL_INTERVAL_MS);
-        if (Date.now() - start > POLL_TIMEOUT_MS) {
-          throw new Error('Generation timed out');
+      try {
+        for (;;) {
+          await sleep(POLL_INTERVAL_MS);
+          if (Date.now() - start > POLL_TIMEOUT_MS) {
+            throw new Error('Generation timed out');
+          }
+          const statusRes = await fetch(statusUrl);
+          const statusData = await statusRes.json().catch(() => ({}));
+          if (statusRes.status === 500 && statusData.error) {
+            throw new Error(statusData.error);
+          }
+          if (statusRes.ok && (statusData.url || statusData.base64Data)) {
+            return parseResult(statusData, params);
+          }
         }
-        const statusRes = await fetch(statusUrl);
-        const statusData = await statusRes.json().catch(() => ({}));
-        if (statusRes.status === 500 && statusData.error) {
-          throw new Error(statusData.error);
-        }
-        if (statusRes.ok && (statusData.url || statusData.base64Data)) {
-          return parseResult(statusData, params);
-        }
+      } finally {
+        removeActiveJob(jobId);
       }
     }
 
@@ -141,6 +178,41 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
   }
 
   throw lastError ?? new Error('Generation failed');
+}
+
+/**
+ * Poll a job until complete (for recovery after reload).
+ * Returns true if job completed (success or error), false if still pending after timeout.
+ * Call onRefetch when a job completes so the caller can refresh the gallery.
+ */
+export async function pollJobUntilComplete(
+  jobId: string,
+  onComplete: () => void,
+  timeoutMs = 5 * 60 * 1000
+): Promise<boolean> {
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+  const statusUrl = `${API_BASE}/api/generate/status/${jobId}`;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await sleep(POLL_INTERVAL_MS);
+    try {
+      const res = await fetch(statusUrl);
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 500 && data.error) {
+        removeActiveJob(jobId);
+        onComplete();
+        return true;
+      }
+      if (res.ok && (data.url || data.base64Data)) {
+        removeActiveJob(jobId);
+        onComplete();
+        return true;
+      }
+    } catch {
+      // keep polling
+    }
+  }
+  return false;
 }
 
 const DELAY_MS = 2000; // Pause between requests to avoid 429 rate limits

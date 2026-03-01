@@ -447,10 +447,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 className="ml-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
               >
                 {(isGenerating || isUploadingRefs) ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
-                    <span>Kreating...</span>
-                  </>
+                  <span>Kreating...</span>
                 ) : (
                   <>
                     <span>Kreate{batchSize > 1 ? ` +${batchSize}` : ''}</span>

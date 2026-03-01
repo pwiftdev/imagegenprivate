@@ -7,7 +7,7 @@ import ImageModal from './components/ImageModal';
 import AuthScreen from './components/AuthScreen';
 import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
-import { generateBatchImages } from './services/imageGeneration';
+import { generateBatchImages, getActiveJobIds, pollJobUntilComplete } from './services/imageGeneration';
 import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
 import { fetchProfilesByIds, fetchProfile } from './services/profileService';
 import { recordGeneration } from './services/stats';
@@ -45,6 +45,7 @@ function App() {
   const [referenceImageUrlsToInject, setReferenceImageUrlsToInject] = useState<string[] | null>(null);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
   const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
+  const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
 
   // Load current user's creator info (for newly generated images)
   useEffect(() => {
@@ -92,7 +93,18 @@ function App() {
       }
     }
     load();
-  }, [user?.id, viewMode]);
+  }, [user?.id, viewMode, imagesRefreshKey]);
+
+  // Recover in-flight jobs after reload
+  useEffect(() => {
+    if (!user?.id) return;
+    const ids = getActiveJobIds();
+    if (ids.length === 0) return;
+    const refetch = () => setImagesRefreshKey((k) => k + 1);
+    ids.forEach((jobId) => {
+      pollJobUntilComplete(jobId, refetch).then(() => {});
+    });
+  }, [user?.id]);
 
   const processBatch = useCallback(async (batch: QueuedBatch) => {
     if (isProcessing) return;
@@ -115,12 +127,28 @@ function App() {
       const saved: GridItem[] = [];
 
       const refUrls = batch.params.referenceImageUrls?.filter((u): u is string => !!u);
+      const modelLabel = batch.params.model ? IMAGE_MODELS[batch.params.model] : undefined;
       for (const img of newImages) {
+        // Backend may have saved metadata (img.id is UUID) – skip duplicate insert
+        const backendSaved = img.storagePath && typeof img.id === 'string' && /^[0-9a-f-]{36}$/i.test(img.id);
+        if (backendSaved) {
+          saved.push({
+            type: 'image',
+            id: img.id,
+            url: img.url,
+            aspectRatio: img.aspectRatio,
+            prompt: img.prompt,
+            imageSize: img.imageSize,
+            model: modelLabel,
+            referenceImageUrls: refUrls,
+            creator: currentUserCreator ?? undefined,
+          });
+          continue;
+        }
         try {
           const stored = img.storagePath
             ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls)
             : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls);
-          const modelLabel = batch.params.model ? IMAGE_MODELS[batch.params.model] : undefined;
           saved.push({
             type: 'image',
             id: stored.id,
@@ -134,7 +162,6 @@ function App() {
           });
         } catch (saveErr) {
           console.error('Failed to save image to Supabase:', saveErr);
-          const modelLabel = batch.params.model ? IMAGE_MODELS[batch.params.model] : undefined;
           saved.push({
             type: 'image',
             id: img.id,
@@ -178,7 +205,8 @@ function App() {
 
     setError(null);
     const batchId = nextBatchId();
-    const batch: QueuedBatch = { id: batchId, params, batchSize };
+    const paramsWithUser = { ...params, userId: user?.id };
+    const batch: QueuedBatch = { id: batchId, params: paramsWithUser, batchSize };
     const isFirstInQueue = queue.length === 0;
 
     const placeholderIds = Array.from({ length: batchSize }, (_, i) => `ph-${batchId}-${i}`);
@@ -192,7 +220,7 @@ function App() {
 
     setGridItems((prev) => [...placeholders, ...prev]);
     setQueue((q) => [...q, batch]);
-  }, [queue]);
+  }, [queue, user?.id]);
 
   const handleImageClick = useCallback((index: number) => {
     setSelectedImageIndex(index);
