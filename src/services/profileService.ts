@@ -82,6 +82,7 @@ export async function uploadAvatar(userId: string, file: File): Promise<string> 
     .upload(path, file, {
       contentType: file.type,
       upsert: true,
+      cacheControl: '31536000', // 1 year - reduce repeated downloads from CDN
     });
 
   if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);

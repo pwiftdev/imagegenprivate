@@ -35,6 +35,7 @@ export async function uploadReferenceImage(base64DataUrl: string): Promise<strin
     .upload(storagePath, blob, {
       contentType: ext === 'png' ? 'image/png' : 'image/jpeg',
       upsert: false,
+      cacheControl: '31536000', // 1 year - reduce repeated downloads from CDN
     });
 
   if (uploadError) {
@@ -103,7 +104,8 @@ export async function saveImageToSupabase(
     .from(BUCKET_NAME)
     .upload(storagePath, blob, {
       contentType: 'image/png',
-      upsert: false
+      upsert: false,
+      cacheControl: '31536000', // 1 year - reduce repeated downloads from CDN
     });
 
   if (uploadError) {
