@@ -3,11 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
   onSignOut: () => void;
+  credits?: number | null;
 }
 
 const BANNER_HEIGHT = 40;
 
-const Header: React.FC<HeaderProps> = ({ onSignOut }) => {
+const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
   const location = useLocation();
   const isProfile = location.pathname === '/profile';
 
@@ -37,6 +38,11 @@ const Header: React.FC<HeaderProps> = ({ onSignOut }) => {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        {typeof credits === 'number' && (
+          <span className="px-3 py-1.5 rounded-lg bg-white/10 text-white/90 text-sm font-medium border border-white/20">
+            {credits} credits
+          </span>
+        )}
         <Link
           to="/profile"
           className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium tracking-wide transition-all ${

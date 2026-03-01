@@ -8,6 +8,7 @@ export interface Profile {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  credits: number;
   created_at: string;
   updated_at: string;
 }
@@ -40,7 +41,7 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, created_at, updated_at')
+    .select('id, username, avatar_url, credits, created_at, updated_at')
     .eq('id', userId)
     .maybeSingle();
 

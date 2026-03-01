@@ -9,7 +9,7 @@ import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { generateImage, getActiveJobIds, pollJobUntilComplete } from './services/imageGeneration';
 import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
-import { fetchProfilesByIds, fetchProfile } from './services/profileService';
+import { fetchProfilesByIds, fetchProfile, updateProfile } from './services/profileService';
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import { IMAGE_MODELS } from './services/imageGeneration';
@@ -47,16 +47,31 @@ function App() {
   const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
   const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
   const [hasMoreImages, setHasMoreImages] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
-  // Load current user's creator info (for newly generated images)
-  useEffect(() => {
+  // Load current user's profile (creator info + credits)
+  const refetchCredits = useCallback(async () => {
     if (!user?.id) return;
-    fetchProfile(user.id).then((p) => {
-      if (p) setCurrentUserCreator({ username: p.username || 'Creator', avatar_url: p.avatar_url });
-    });
-  }, [user?.id]);
+    let p = await fetchProfile(user.id);
+    if (!p) {
+      try {
+        await updateProfile(user.id, { username: user.email?.split('@')[0] || undefined });
+        p = await fetchProfile(user.id);
+      } catch {
+        // ignore
+      }
+    }
+    if (p) {
+      setCurrentUserCreator({ username: p.username || 'Creator', avatar_url: p.avatar_url });
+      setCredits(typeof p.credits === 'number' ? p.credits : 0);
+    }
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    void refetchCredits();
+  }, [refetchCredits]);
 
   // Load images from Supabase (paginated, refetch when viewMode/refreshKey changes)
   useEffect(() => {
@@ -242,6 +257,7 @@ function App() {
             return [gridImage, ...filtered];
           });
           recordGeneration(1);
+          void refetchCredits();
         })
         .catch((err) => {
           setError(err instanceof Error ? err.message : 'Failed to generate image');
@@ -251,7 +267,7 @@ function App() {
           setRunningCount((c) => c - 1);
         });
     });
-  }, [queue, runningCount, currentUserCreator]);
+  }, [queue, runningCount, currentUserCreator, refetchCredits]);
 
   useEffect(() => {
     processQueue();
@@ -336,7 +352,7 @@ function App() {
 
   return (
     <>
-      <Header onSignOut={signOut} />
+      <Header onSignOut={signOut} credits={credits} />
       <Routes>
         <Route path="/profile" element={<ProfilePage user={user} />} />
         <Route path="/" element={
@@ -479,6 +495,7 @@ function App() {
           <ControlPanel
             onGenerate={handleGenerate}
             isGenerating={runningCount > 0}
+            credits={credits}
             promptToInject={promptToInject}
             onPromptInjected={handlePromptInjected}
             referenceImageUrlToInject={referenceImageUrlToInject}

@@ -8,6 +8,7 @@ import { IMAGE_MODELS } from '../services/imageGeneration';
 interface ControlPanelProps {
   onGenerate?: (params: ImageGenerationParams, batchSize: number) => void;
   isGenerating?: boolean;
+  credits?: number | null;
   promptToInject?: string | null;
   onPromptInjected?: () => void;
   referenceImageUrlToInject?: string | null;
@@ -27,6 +28,7 @@ const MAX_REFERENCE_IMAGES = 6;
 const ControlPanel: React.FC<ControlPanelProps> = ({
   onGenerate,
   isGenerating = false,
+  credits,
   promptToInject,
   onPromptInjected,
   referenceImageUrlToInject,
@@ -441,10 +443,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </button>
               </div>
 
-              {/* Generate Button */}
+              {/* Credits display + Generate Button */}
+              {typeof credits === 'number' && (
+                <span className="text-white/70 text-sm">
+                  {credits} credits
+                </span>
+              )}
               <button
                 onClick={() => void handleGenerateClick()}
-                disabled={!prompt.trim() || isUploadingRefs}
+                disabled={!prompt.trim() || isUploadingRefs || (typeof credits === 'number' && credits < batchSize)}
+                title={typeof credits === 'number' && credits < batchSize ? 'Not enough credits' : undefined}
                 className="ml-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
               >
                 {(isGenerating || isUploadingRefs) ? (

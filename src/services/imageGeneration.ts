@@ -169,6 +169,9 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
       return parseResult(data, params);
     }
 
+    if (response.status === 402) {
+      throw new Error(data.error || 'Insufficient credits');
+    }
     lastError = new Error(data.error || `Generation failed: ${response.status}`);
     const retryable = response.status === 429 || response.status === 503;
     if (!retryable || attempt === MAX_RETRIES - 1) throw lastError;
