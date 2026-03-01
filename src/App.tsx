@@ -46,6 +46,8 @@ function App() {
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
   const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
   const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
+  const [hasMoreImages, setHasMoreImages] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Load current user's creator info (for newly generated images)
   useEffect(() => {
@@ -55,13 +57,13 @@ function App() {
     });
   }, [user?.id]);
 
-  // Load images from Supabase (refetch when viewMode changes)
+  // Load images from Supabase (paginated, refetch when viewMode/refreshKey changes)
   useEffect(() => {
     if (!user) return;
     async function load() {
       setIsLoading(true);
       try {
-        const stored = await fetchImagesFromSupabase(viewMode);
+        const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 24, offset: 0 });
         const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
         const creatorMap = await fetchProfilesByIds(userIds);
         const newImages: GridItem[] = stored
@@ -80,6 +82,7 @@ function App() {
           const placeholders = prev.filter((item): item is Extract<GridItem, { type: 'placeholder' }> => item.type === 'placeholder');
           return [...placeholders, ...newImages];
         });
+        setHasMoreImages(hasMore);
       } catch (err) {
         console.error('Failed to load images:', err);
         const msg = err instanceof Error ? err.message : 'Failed to load images';
@@ -94,6 +97,34 @@ function App() {
     }
     load();
   }, [user?.id, viewMode, imagesRefreshKey]);
+
+  const loadMoreImages = useCallback(async () => {
+    if (!user || isLoadingMore || !hasMoreImages) return;
+    setIsLoadingMore(true);
+    try {
+      const currentImages = gridItems.filter((i): i is Extract<GridItem, { type: 'image' }> => i.type === 'image');
+      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 24, offset: currentImages.length });
+      const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
+      const creatorMap = await fetchProfilesByIds(userIds);
+      const moreImages: GridItem[] = stored.map((img) => ({
+        type: 'image' as const,
+        id: img.id,
+        url: img.url,
+        aspectRatio: img.aspect_ratio || '',
+        prompt: img.prompt || '',
+        imageSize: img.image_size || '',
+        referenceImageUrls: Array.isArray(img.reference_image_urls) ? img.reference_image_urls : undefined,
+        creator: img.user_id ? creatorMap.get(img.user_id) : undefined,
+      }));
+      setGridItems((prev) => [...prev, ...moreImages]);
+      setHasMoreImages(hasMore);
+    } catch (err) {
+      console.error('Failed to load more images:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load more');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [user?.id, viewMode, gridItems, hasMoreImages, isLoadingMore]);
 
   // Recover in-flight jobs after reload: add "generating" placeholders, poll, refetch when done
   useEffect(() => {
@@ -378,12 +409,25 @@ function App() {
               </div>
             </div>
           ) : (
-            <ImageGrid
-              items={filteredItems}
-              onImageClick={handleImageClick}
-              onReRun={handleReRun}
-              onAddToReference={(url) => { setReferenceImageUrlToInject(url); setControlPanelOpen(true); }}
-            />
+            <>
+              <ImageGrid
+                items={filteredItems}
+                onImageClick={handleImageClick}
+                onReRun={handleReRun}
+                onAddToReference={(url) => { setReferenceImageUrlToInject(url); setControlPanelOpen(true); }}
+              />
+              {hasMoreImages && (
+                <div className="flex justify-center py-6">
+                  <button
+                    onClick={loadMoreImages}
+                    disabled={isLoadingMore}
+                    className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingMore ? 'Loading...' : 'Load more'}
+                  </button>
+                </div>
+              )}
+            </>
           );
         })()}
       </div>

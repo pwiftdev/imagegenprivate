@@ -195,14 +195,27 @@ export async function saveImageMetadataToSupabase(
 
 export type ImageScope = 'mine' | 'all';
 
+const DEFAULT_PAGE_SIZE = 24;
+
+export interface FetchImagesResult {
+  images: StoredImage[];
+  hasMore: boolean;
+}
+
 /**
- * Fetch images from Supabase (newest first).
+ * Fetch images from Supabase (newest first), paginated to reduce egress.
  * scope: 'mine' = only current user's images, 'all' = everyone's images
  */
-export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promise<StoredImage[]> {
+export async function fetchImagesFromSupabase(
+  scope: ImageScope = 'mine',
+  options?: { limit?: number; offset?: number }
+): Promise<FetchImagesResult> {
   if (!supabase) {
-    return [];
+    return { images: [], hasMore: false };
   }
+
+  const limit = options?.limit ?? DEFAULT_PAGE_SIZE;
+  const offset = options?.offset ?? 0;
 
   const baseSelect = 'id, created_at, user_id, prompt, aspect_ratio, image_size, storage_path, file_name';
   let rows: Record<string, unknown>[] | null = null;
@@ -211,8 +224,9 @@ export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promi
   // Try with reference_image_urls first (requires migration)
   let query = supabase
     .from('images')
-    .select(`${baseSelect}, reference_image_urls`)
-    .order('created_at', { ascending: false });
+    .select(`${baseSelect}, reference_image_urls`, { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
   if (scope === 'mine') {
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.id) query = query.eq('user_id', user.id);
@@ -224,8 +238,9 @@ export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promi
     // Fallback: column may not exist yet
     let query2 = supabase
       .from('images')
-      .select(baseSelect)
-      .order('created_at', { ascending: false });
+      .select(baseSelect, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
     if (scope === 'mine') {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.id) query2 = query2.eq('user_id', user.id);
@@ -241,14 +256,13 @@ export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promi
   }
 
   if (!rows || rows.length === 0) {
-    return [];
+    return { images: [], hasMore: false };
   }
 
   const client = supabase;
-  if (!client) return [];
+  if (!client) return { images: [], hasMore: false };
 
-  // Build public URLs for each image
-  return (rows || []).map((row) => {
+  const images = (rows || []).map((row) => {
     const r = row as { storage_path: string; [k: string]: unknown };
     const { data: urlData } = client.storage
       .from(BUCKET_NAME)
@@ -259,6 +273,10 @@ export async function fetchImagesFromSupabase(scope: ImageScope = 'mine'): Promi
       url: urlData.publicUrl
     } as StoredImage;
   });
+
+  const hasMore = rows.length === limit;
+
+  return { images, hasMore };
 }
 
 const COST_PER_IMAGE = 0.05;

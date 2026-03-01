@@ -75,6 +75,7 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onReRun
             <img
               src={item.url}
               alt={`Generated image ${index + 1}`}
+              loading="lazy"
               className="w-full h-auto block rounded-lg"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -87,6 +88,7 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onReRun
                   <img
                     src={item.creator.avatar_url}
                     alt=""
+                    loading="lazy"
                     className="w-4 h-4 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
