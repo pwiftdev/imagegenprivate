@@ -255,16 +255,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="info-bar-shimmer" />
             <div className="relative flex items-center justify-between gap-3">
               <p className="text-white/70 text-sm flex-1">
-              Describe your vision, add reference images, and pick an aspect ratio. Powered by {IMAGE_MODELS[selectedModel]}.
+              Describe your vision, add reference images, and pick an aspect ratio. All flagship models available!
               </p>
               {onCloseMobile && (
                 <button
                   onClick={onCloseMobile}
-                  className="md:hidden flex-shrink-0 text-white/80 hover:text-white p-1"
-                  aria-label="Close"
+                  className="flex-shrink-0 text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  aria-label="Minimize"
+                  title="Minimize"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
               )}

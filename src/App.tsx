@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ImageGrid, { type CreatorInfo } from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
@@ -16,7 +16,7 @@ import { IMAGE_MODELS } from './services/imageGeneration';
 import './App.css';
 
 type GridItem =
-  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
+  | { type: 'image'; id: string; url: string; thumbUrl?: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface QueuedJob {
@@ -48,6 +48,7 @@ function App() {
   const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
   const [hasMoreImages, setHasMoreImages] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
   // Load current user's creator info (for newly generated images)
   useEffect(() => {
@@ -72,6 +73,7 @@ function App() {
             type: 'image' as const,
             id: img.id,
             url: img.url,
+            thumbUrl: img.thumbUrl,
             aspectRatio: img.aspect_ratio || '',
             prompt: img.prompt || '',
             imageSize: img.image_size || '',
@@ -110,6 +112,7 @@ function App() {
         type: 'image' as const,
         id: img.id,
         url: img.url,
+        thumbUrl: img.thumbUrl,
         aspectRatio: img.aspect_ratio || '',
         prompt: img.prompt || '',
         imageSize: img.image_size || '',
@@ -125,6 +128,21 @@ function App() {
       setIsLoadingMore(false);
     }
   }, [user?.id, viewMode, gridItems, hasMoreImages, isLoadingMore]);
+
+  // Infinite scroll: load more when sentinel enters viewport
+  useEffect(() => {
+    if (!hasMoreImages || isLoadingMore || !user) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMoreImages();
+      },
+      { rootMargin: '200px', threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreImages, isLoadingMore, user, loadMoreImages]);
 
   // Recover in-flight jobs after reload: add "generating" placeholders, poll, refetch when done
   useEffect(() => {
@@ -173,12 +191,13 @@ function App() {
         .then(async (img) => {
           let gridImage: GridItem;
           const backendSaved = img.storagePath && typeof img.id === 'string' && /^[0-9a-f-]{36}$/i.test(img.id);
-          if (backendSaved) {
-            gridImage = {
-              type: 'image',
-              id: img.id,
-              url: img.url,
-              aspectRatio: img.aspectRatio,
+        if (backendSaved) {
+          gridImage = {
+            type: 'image',
+            id: img.id,
+            url: img.url,
+            thumbUrl: undefined,
+            aspectRatio: img.aspectRatio,
               prompt: img.prompt,
               imageSize: img.imageSize,
               model: modelLabel,
@@ -194,6 +213,7 @@ function App() {
                 type: 'image',
                 id: stored.id,
                 url: stored.url,
+                thumbUrl: stored.thumbUrl,
                 aspectRatio: stored.aspect_ratio || img.aspectRatio,
                 prompt: stored.prompt || img.prompt,
                 imageSize: stored.image_size || img.imageSize,
@@ -207,6 +227,7 @@ function App() {
                 type: 'image',
                 id: img.id,
                 url: img.url,
+                thumbUrl: undefined,
                 aspectRatio: img.aspectRatio,
                 prompt: img.prompt,
                 imageSize: img.imageSize,
@@ -319,10 +340,10 @@ function App() {
       <Routes>
         <Route path="/profile" element={<ProfilePage user={user} />} />
         <Route path="/" element={
-    <div className="min-h-screen bg-black pb-32 pt-14">
+    <div className="min-h-screen bg-black pb-32 pt-24">
       {/* Error notification */}
       {error && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
+        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
           <div className="bg-red-500/90 backdrop-blur-sm text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -340,7 +361,7 @@ function App() {
 
       {/* Loading indicator */}
       {runningCount > 0 && (
-        <div className="fixed top-20 right-6 z-50">
+        <div className="fixed top-24 right-6 z-50">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
             <span className="text-sm">Generating images...</span>
@@ -348,38 +369,47 @@ function App() {
         </div>
       )}
 
-      {/* Section title + quality filter + view mode */}
-      <div className="w-full px-6 pt-6 pb-2">
-        <div className="flex items-center gap-4 flex-wrap">
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            {viewMode === 'mine' ? 'Your Kreations' : 'What people are Kreating'}
-          </h1>
-          <button
-            onClick={() => setViewMode(viewMode === 'mine' ? 'all' : 'mine')}
-            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
-          >
-            {viewMode === 'mine' ? 'See what people are Kreating' : 'Show only my Kreations'}
-          </button>
-          <div className="flex items-center gap-2">
-            {(['All', '1K', '2K', '4K'] as const).map((q) => (
-              <button
-                key={q}
-                onClick={() => setQualityFilter(q)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  qualityFilter === q
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
-                }`}
-              >
-                {q}
-              </button>
-            ))}
+      {/* Content container - single wrapper for alignment */}
+      <div className="w-full max-w-7xl mx-auto px-6">
+        {/* Dashboard header + stats (mine view) or simple header (all view) */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-6 pt-6">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+              {viewMode === 'mine' ? 'Your Kreations' : 'What people are Kreating'}
+            </h1>
+            <p className="text-white/60 text-base mt-1">
+              {viewMode === 'mine'
+                ? 'Your creative hub — track your work and explore new ideas'
+                : 'Discover what the community is creating'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap pr-[7px]">
+            <button
+              onClick={() => setViewMode(viewMode === 'mine' ? 'all' : 'mine')}
+              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
+            >
+              {viewMode === 'mine' ? 'Explore community' : 'Back to my Kreations'}
+            </button>
+            <div className="flex items-center gap-2">
+              {(['All', '1K', '2K', '4K'] as const).map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setQualityFilter(q)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    qualityFilter === q
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                  }`}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Image Grid Background */}
-      <div className="w-full pt-2">
+        {/* Image Grid */}
+        <div className="pt-2">
         {isLoading ? (
           <div className="flex items-center justify-center min-h-[60vh] text-white/40">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/30 border-t-white"></div>
@@ -417,35 +447,32 @@ function App() {
                 onAddToReference={(url) => { setReferenceImageUrlToInject(url); setControlPanelOpen(true); }}
               />
               {hasMoreImages && (
-                <div className="flex justify-center py-6">
-                  <button
-                    onClick={loadMoreImages}
-                    disabled={isLoadingMore}
-                    className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoadingMore ? 'Loading...' : 'Load more'}
-                  </button>
+                <div ref={loadMoreSentinelRef} className="flex justify-center py-8 min-h-12">
+                  {isLoadingMore && (
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/30 border-t-white" />
+                  )}
                 </div>
               )}
             </>
           );
         })()}
+        </div>
       </div>
 
-      {/* Start Kreating button - mobile only, when panel is closed */}
+      {/* Start Kreating button - full-width bar at bottom when panel is minimized */}
       {!controlPanelOpen && (
         <button
           onClick={() => setControlPanelOpen(true)}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 md:hidden bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all"
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-[32%] bg-blue-500 hover:bg-blue-600 text-white py-4 rounded-t-3xl shadow-lg shadow-blue-500/30 transition-colors active:bg-blue-700"
         >
-          Start Kreating
+          Start <span className="text-xl font-bold tracking-tight">Kreating</span>
         </button>
       )}
 
-      {/* Control Panel - Overlapping at bottom with liquid glass effect */}
+      {/* Control Panel - slides up from bottom, Mac-like animation */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-50 pointer-events-none transition-transform duration-300 md:translate-y-0 ${
-          controlPanelOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'
+        className={`fixed bottom-0 left-0 right-0 z-50 pointer-events-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] origin-bottom ${
+          controlPanelOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
         <div className="flex justify-center">

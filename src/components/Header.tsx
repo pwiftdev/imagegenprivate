@@ -5,12 +5,25 @@ interface HeaderProps {
   onSignOut: () => void;
 }
 
+const BANNER_HEIGHT = 40;
+
 const Header: React.FC<HeaderProps> = ({ onSignOut }) => {
   const location = useLocation();
   const isProfile = location.pathname === '/profile';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-6 bg-black/40 backdrop-blur-xl border-b border-white/10">
+    <>
+      {/* Announcement banner */}
+      <div
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-medium"
+        style={{ height: BANNER_HEIGHT }}
+      >
+        <span>Up to 50 FREE <span className="font-bold tracking-tight">Kreations</span> with Nano Banana Pro now!</span>
+      </div>
+      <header
+        className="fixed left-0 right-0 z-40 h-14 flex items-center justify-between px-6 bg-black/40 backdrop-blur-xl border-b border-white/10"
+        style={{ top: BANNER_HEIGHT }}
+      >
       {/* Logo / Brand */}
       <div className="flex items-center gap-3">
         <Link to="/" className="flex items-center gap-3">
@@ -23,13 +36,13 @@ const Header: React.FC<HeaderProps> = ({ onSignOut }) => {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <Link
           to="/profile"
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl border border-white/20 text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium tracking-wide transition-all ${
             isProfile
-              ? 'bg-blue-500/30 text-white border-blue-500/40'
-              : 'bg-white/10 hover:bg-white/15 text-white'
+              ? 'bg-blue-500/20 text-white border-blue-400/60 shadow-[0_0_12px_rgba(59,130,246,0.3)]'
+              : 'bg-transparent text-white border-blue-400/40 hover:border-blue-400/70 hover:bg-blue-500/10 hover:shadow-[0_0_12px_rgba(59,130,246,0.2)]'
           }`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({ onSignOut }) => {
         </Link>
         <button
           onClick={onSignOut}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-400/40 bg-transparent text-white text-sm font-medium tracking-wide transition-all hover:border-blue-400/70 hover:bg-blue-500/10 hover:shadow-[0_0_12px_rgba(59,130,246,0.2)]"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -48,7 +61,10 @@ const Header: React.FC<HeaderProps> = ({ onSignOut }) => {
         </button>
       </div>
     </header>
+    </>
   );
 };
+
+export { BANNER_HEIGHT };
 
 export default Header;

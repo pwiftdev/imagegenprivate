@@ -59,6 +59,8 @@ export async function uploadReferenceImages(base64DataUrls: string[]): Promise<s
   return urls;
 }
 
+const GRID_THUMB_WIDTH = 400;
+
 export interface StoredImage {
   id: string;
   created_at: string;
@@ -69,7 +71,8 @@ export interface StoredImage {
   storage_path: string;
   file_name: string | null;
   reference_image_urls?: string[] | null;
-  url: string; // Public URL for display
+  url: string; // Full quality URL (for modal)
+  thumbUrl?: string; // Smaller thumbnail URL (for grid, faster load)
 }
 
 /**
@@ -112,12 +115,13 @@ export async function saveImageToSupabase(
     throw new Error(`Upload failed: ${uploadError.message}`);
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(storagePath);
-
+  // Get public URL (full + thumbnail)
+  const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
+  const { data: thumbData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath, {
+    transform: { width: GRID_THUMB_WIDTH, quality: 80, resize: 'contain' },
+  });
   const publicUrl = urlData.publicUrl;
+  const thumbUrl = thumbData.publicUrl;
 
   const { data: { user } } = await supabase.auth.getUser();
   const insertPayload: Record<string, unknown> = {
@@ -145,7 +149,8 @@ export async function saveImageToSupabase(
 
   return {
     ...row,
-    url: publicUrl
+    url: publicUrl,
+    thumbUrl,
   };
 }
 
@@ -164,7 +169,11 @@ export async function saveImageMetadataToSupabase(
   }
 
   const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
+  const { data: thumbData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath, {
+    transform: { width: GRID_THUMB_WIDTH, quality: 80, resize: 'contain' },
+  });
   const publicUrl = urlData.publicUrl;
+  const thumbUrl = thumbData.publicUrl;
 
   const { data: { user } } = await supabase.auth.getUser();
   const insertPayload: Record<string, unknown> = {
@@ -191,7 +200,8 @@ export async function saveImageMetadataToSupabase(
 
   return {
     ...row,
-    url: publicUrl
+    url: publicUrl,
+    thumbUrl,
   };
 }
 
@@ -269,10 +279,16 @@ export async function fetchImagesFromSupabase(
     const { data: urlData } = client.storage
       .from(BUCKET_NAME)
       .getPublicUrl(r.storage_path);
+    const { data: thumbData } = client.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(r.storage_path, {
+        transform: { width: GRID_THUMB_WIDTH, quality: 80, resize: 'contain' },
+      });
 
     return {
       ...r,
-      url: urlData.publicUrl
+      url: urlData.publicUrl,
+      thumbUrl: thumbData.publicUrl,
     } as StoredImage;
   });
 
@@ -289,10 +305,36 @@ export interface ImageStats {
   totalCost: number;
   monthlyOverview: { month: string; images: number; cost: number }[];
   recentActivity: { date: string; count: number; cost: number }[];
+  byQuality?: { '1K': number; '2K': number; '4K': number };
 }
 
 /**
- * Fetch stats derived from Supabase (source of truth for image count)
+ * Fetch stats for a specific user (for dashboard).
+ * Returns ImageStats filtered by user_id, includes quality breakdown.
+ */
+export async function fetchUserStats(userId: string): Promise<ImageStats> {
+  if (!supabase || !userId) {
+    return {
+      totalImages: 0,
+      totalApiCalls: 0,
+      totalCost: 0,
+      monthlyOverview: [],
+      recentActivity: [],
+      byQuality: { '1K': 0, '2K': 0, '4K': 0 }
+    };
+  }
+
+  const { data: rows, error } = await supabase
+    .from('images')
+    .select('id, created_at, image_size')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  return buildUserImageStats(rows || [], error);
+}
+
+/**
+ * Fetch stats for all images (global, for StatisticsModal).
  */
 export async function fetchStatsFromSupabase(): Promise<ImageStats> {
   if (!supabase) {
@@ -307,9 +349,16 @@ export async function fetchStatsFromSupabase(): Promise<ImageStats> {
 
   const { data: rows, error } = await supabase
     .from('images')
-    .select('id, created_at')
+    .select('id, created_at, image_size')
     .order('created_at', { ascending: false });
 
+  return buildUserImageStats(rows || [], error);
+}
+
+function buildUserImageStats(
+  images: { id: string; created_at: string; image_size?: string | null }[],
+  error: { message: string } | null
+): ImageStats {
   if (error) {
     console.error('Failed to fetch stats:', error);
     return {
@@ -317,18 +366,21 @@ export async function fetchStatsFromSupabase(): Promise<ImageStats> {
       totalApiCalls: 0,
       totalCost: 0,
       monthlyOverview: [],
-      recentActivity: []
+      recentActivity: [],
+      byQuality: { '1K': 0, '2K': 0, '4K': 0 }
     };
   }
 
-  const images = rows || [];
   const totalImages = images.length;
   const totalCost = totalImages * COST_PER_IMAGE;
 
+  const byQuality = { '1K': 0 as number, '2K': 0 as number, '4K': 0 as number };
   const byMonth = new Map<string, { images: number; cost: number }>();
   const byDay = new Map<string, { count: number; cost: number }>();
 
   for (const img of images) {
+    const size = (img.image_size || '1K') as keyof typeof byQuality;
+    if (size in byQuality) byQuality[size as '1K' | '2K' | '4K']++;
     const date = new Date(img.created_at);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const dayKey = date.toISOString().slice(0, 10);
@@ -366,6 +418,8 @@ export async function fetchStatsFromSupabase(): Promise<ImageStats> {
     totalApiCalls: totalImages,
     totalCost,
     monthlyOverview,
-    recentActivity
+    recentActivity,
+    byQuality
   };
 }
+

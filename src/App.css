@@ -51,6 +51,12 @@
   100% { transform: translateX(200%) skewX(-15deg); }
 }
 
+/* Recharts dark theme (profile dashboard) */
+.recharts-cartesian-axis-tick-value,
+.recharts-legend-item-text {
+  fill: rgba(148, 163, 184, 0.9) !important;
+}
+
 .info-bar-shimmer {
   position: absolute;
   inset: 0;

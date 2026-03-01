@@ -4,7 +4,7 @@ import Masonry from '@mui/lab/Masonry';
 export type CreatorInfo = { username: string; avatar_url: string | null };
 
 export type ImageGridItem =
-  | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
+  | { type: 'image'; id: string; url: string; thumbUrl?: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface ImageGridProps {
@@ -27,11 +27,10 @@ function hashToDelay(id: string, maxMs: number): number {
 
 const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onReRun, onAddToReference }) => {
   return (
-    <div className="p-2 w-full">
+    <div className="w-full">
       <Masonry
         columns={{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
         spacing={1.5}
-        sequential
         sx={{ width: '100%' }}
       >
       {items.map((item, index) => {
@@ -69,17 +68,23 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onReRun
           <div
             key={item.id}
             className="animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] rounded-lg"
-            style={{ animationDelay: `${hashToDelay(item.id, 800)}ms` }}
+            style={{ aspectRatio: parseAspectRatio(item.aspectRatio), animationDelay: `${hashToDelay(item.id, 800)}ms` }}
             onClick={() => onImageClick?.(index)}
           >
             <img
-              src={item.url}
+              src={item.thumbUrl || item.url}
               alt={`Generated image ${index + 1}`}
               loading="lazy"
-              className="w-full h-auto block rounded-lg"
+              decoding="async"
+              fetchPriority={index < 6 ? 'high' : 'low'}
+              className="absolute inset-0 w-full h-full object-cover rounded-lg"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = `https://via.placeholder.com/400x400/1a1a1a/666666?text=Image+${index + 1}`;
+                if (item.thumbUrl && target.src !== item.url) {
+                  target.src = item.url;
+                } else {
+                  target.src = `https://via.placeholder.com/400x400/1a1a1a/666666?text=Image+${index + 1}`;
+                }
               }}
             />
             {item.creator && (
