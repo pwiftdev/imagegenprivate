@@ -183,11 +183,11 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
 /**
  * Poll a job until complete (for recovery after reload).
  * Returns true if job completed (success or error), false if still pending after timeout.
- * Call onRefetch when a job completes so the caller can refresh the gallery.
+ * Calls onComplete(jobId) when done so the caller can remove the placeholder and refetch.
  */
 export async function pollJobUntilComplete(
   jobId: string,
-  onComplete: () => void,
+  onComplete: (completedJobId: string) => void,
   timeoutMs = 5 * 60 * 1000
 ): Promise<boolean> {
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -200,18 +200,20 @@ export async function pollJobUntilComplete(
       const data = await res.json().catch(() => ({}));
       if (res.status === 500 && data.error) {
         removeActiveJob(jobId);
-        onComplete();
+        onComplete(jobId);
         return true;
       }
       if (res.ok && (data.url || data.base64Data)) {
         removeActiveJob(jobId);
-        onComplete();
+        onComplete(jobId);
         return true;
       }
     } catch {
       // keep polling
     }
   }
+  removeActiveJob(jobId);
+  onComplete(jobId);
   return false;
 }
 

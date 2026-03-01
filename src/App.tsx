@@ -95,14 +95,25 @@ function App() {
     load();
   }, [user?.id, viewMode, imagesRefreshKey]);
 
-  // Recover in-flight jobs after reload
+  // Recover in-flight jobs after reload: add "generating" placeholders, poll, refetch when done
   useEffect(() => {
     if (!user?.id) return;
     const ids = getActiveJobIds();
     if (ids.length === 0) return;
-    const refetch = () => setImagesRefreshKey((k) => k + 1);
+    const placeholders: GridItem[] = ids.map((jobId) => ({
+      type: 'placeholder',
+      id: `recovery-${jobId}`,
+      status: 'generating' as const,
+      aspectRatio: '3:2',
+      imageSize: '1K',
+    }));
+    setGridItems((prev) => [...placeholders, ...prev]);
+    const onJobComplete = (completedJobId: string) => {
+      setGridItems((prev) => prev.filter((p) => !(p.type === 'placeholder' && p.id === `recovery-${completedJobId}`)));
+      setImagesRefreshKey((k) => k + 1);
+    };
     ids.forEach((jobId) => {
-      pollJobUntilComplete(jobId, refetch).then(() => {});
+      pollJobUntilComplete(jobId, onJobComplete).then(() => {});
     });
   }, [user?.id]);
 
