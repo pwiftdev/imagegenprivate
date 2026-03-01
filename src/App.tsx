@@ -7,7 +7,7 @@ import ImageModal from './components/ImageModal';
 import AuthScreen from './components/AuthScreen';
 import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
-import { generateBatchImages, getActiveJobIds, pollJobUntilComplete } from './services/imageGeneration';
+import { generateImage, getActiveJobIds, pollJobUntilComplete } from './services/imageGeneration';
 import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
 import { fetchProfilesByIds, fetchProfile } from './services/profileService';
 import { recordGeneration } from './services/stats';
@@ -19,22 +19,22 @@ type GridItem =
   | { type: 'image'; id: string; url: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
-interface QueuedBatch {
+interface QueuedJob {
   id: string;
   params: ImageGenerationParams;
-  batchSize: number;
 }
 
-let batchIdCounter = 0;
-function nextBatchId() {
-  return `batch-${++batchIdCounter}`;
+const MAX_CONCURRENT = 3;
+let jobIdCounter = 0;
+function nextJobId() {
+  return `job-${++jobIdCounter}`;
 }
 
 function App() {
   const { user, loading: authLoading, signIn, signUp, signOut } = useAuth();
   const [gridItems, setGridItems] = useState<GridItem[]>([]);
-  const [queue, setQueue] = useState<QueuedBatch[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [queue, setQueue] = useState<QueuedJob[]>([]);
+  const [runningCount, setRunningCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
@@ -148,96 +148,93 @@ function App() {
     });
   }, [user?.id]);
 
-  const processBatch = useCallback(async (batch: QueuedBatch) => {
-    if (isProcessing) return;
+  const processQueue = useCallback(() => {
+    if (runningCount >= MAX_CONCURRENT || queue.length === 0) return;
 
-    setIsProcessing(true);
-    setQueue((q) => q.filter((b) => b.id !== batch.id));
+    const toStart = Math.min(MAX_CONCURRENT - runningCount, queue.length);
+    const jobsToStart = queue.slice(0, toStart);
+    const jobIds = jobsToStart.map((j) => j.id);
 
-    const placeholderIds = Array.from({ length: batch.batchSize }, (_, i) => `ph-${batch.id}-${i}`);
-
+    setQueue((q) => q.slice(toStart));
+    setRunningCount((c) => c + toStart);
     setGridItems((prev) =>
       prev.map((item) =>
-        item.type === 'placeholder' && placeholderIds.includes(item.id)
+        item.type === 'placeholder' && jobIds.includes(item.id)
           ? { ...item, status: 'generating' as const }
           : item
       )
     );
 
-    try {
-      const newImages = await generateBatchImages(batch.params, batch.batchSize);
-      const saved: GridItem[] = [];
+    jobsToStart.forEach((job) => {
+      const refUrls = job.params.referenceImageUrls?.filter((u): u is string => !!u);
+      const modelLabel = job.params.model ? IMAGE_MODELS[job.params.model] : undefined;
 
-      const refUrls = batch.params.referenceImageUrls?.filter((u): u is string => !!u);
-      const modelLabel = batch.params.model ? IMAGE_MODELS[batch.params.model] : undefined;
-      for (const img of newImages) {
-        // Backend may have saved metadata (img.id is UUID) – skip duplicate insert
-        const backendSaved = img.storagePath && typeof img.id === 'string' && /^[0-9a-f-]{36}$/i.test(img.id);
-        if (backendSaved) {
-          saved.push({
-            type: 'image',
-            id: img.id,
-            url: img.url,
-            aspectRatio: img.aspectRatio,
-            prompt: img.prompt,
-            imageSize: img.imageSize,
-            model: modelLabel,
-            referenceImageUrls: refUrls,
-            creator: currentUserCreator ?? undefined,
+      generateImage(job.params)
+        .then(async (img) => {
+          let gridImage: GridItem;
+          const backendSaved = img.storagePath && typeof img.id === 'string' && /^[0-9a-f-]{36}$/i.test(img.id);
+          if (backendSaved) {
+            gridImage = {
+              type: 'image',
+              id: img.id,
+              url: img.url,
+              aspectRatio: img.aspectRatio,
+              prompt: img.prompt,
+              imageSize: img.imageSize,
+              model: modelLabel,
+              referenceImageUrls: refUrls,
+              creator: currentUserCreator ?? undefined,
+            };
+          } else {
+            try {
+              const stored = img.storagePath
+                ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls)
+                : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls);
+              gridImage = {
+                type: 'image',
+                id: stored.id,
+                url: stored.url,
+                aspectRatio: stored.aspect_ratio || img.aspectRatio,
+                prompt: stored.prompt || img.prompt,
+                imageSize: stored.image_size || img.imageSize,
+                model: modelLabel,
+                referenceImageUrls: refUrls,
+                creator: currentUserCreator ?? undefined,
+              };
+            } catch (saveErr) {
+              console.error('Failed to save image to Supabase:', saveErr);
+              gridImage = {
+                type: 'image',
+                id: img.id,
+                url: img.url,
+                aspectRatio: img.aspectRatio,
+                prompt: img.prompt,
+                imageSize: img.imageSize,
+                model: modelLabel,
+                referenceImageUrls: refUrls,
+                creator: currentUserCreator ?? undefined,
+              };
+            }
+          }
+          setGridItems((prev) => {
+            const filtered = prev.filter((p) => !(p.type === 'placeholder' && p.id === job.id));
+            return [gridImage, ...filtered];
           });
-          continue;
-        }
-        try {
-          const stored = img.storagePath
-            ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls)
-            : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls);
-          saved.push({
-            type: 'image',
-            id: stored.id,
-            url: stored.url,
-            aspectRatio: stored.aspect_ratio || img.aspectRatio,
-            prompt: stored.prompt || img.prompt,
-            imageSize: stored.image_size || img.imageSize,
-            model: modelLabel,
-            referenceImageUrls: refUrls,
-            creator: currentUserCreator ?? undefined,
-          });
-        } catch (saveErr) {
-          console.error('Failed to save image to Supabase:', saveErr);
-          saved.push({
-            type: 'image',
-            id: img.id,
-            url: img.url,
-            aspectRatio: img.aspectRatio,
-            prompt: img.prompt,
-            imageSize: img.imageSize,
-            model: modelLabel,
-            referenceImageUrls: refUrls,
-            creator: currentUserCreator ?? undefined,
-          });
-        }
-      }
-
-      setGridItems((prev) => {
-        const filtered = prev.filter((p) => p.type !== 'placeholder' || !placeholderIds.includes(p.id));
-        return [...saved, ...filtered];
-      });
-      recordGeneration(newImages.length);
-      console.log(`✅ Generated and saved ${saved.length} image(s)`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate images';
-      setError(errorMessage);
-      setGridItems((prev) => prev.filter((p) => p.type !== 'placeholder' || !placeholderIds.includes(p.id)));
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [isProcessing, currentUserCreator]);
+          recordGeneration(1);
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : 'Failed to generate image');
+          setGridItems((prev) => prev.filter((p) => !(p.type === 'placeholder' && p.id === job.id)));
+        })
+        .finally(() => {
+          setRunningCount((c) => c - 1);
+        });
+    });
+  }, [queue, runningCount, currentUserCreator]);
 
   useEffect(() => {
-    if (queue.length > 0 && !isProcessing) {
-      processBatch(queue[0]);
-    }
-  }, [queue, isProcessing, processBatch]);
+    processQueue();
+  }, [queue, runningCount, processQueue]);
 
   const handleGenerate = useCallback((params: ImageGenerationParams, batchSize: number) => {
     if (!params.prompt.trim()) {
@@ -246,23 +243,26 @@ function App() {
     }
 
     setError(null);
-    const batchId = nextBatchId();
     const paramsWithUser = { ...params, userId: user?.id };
-    const batch: QueuedBatch = { id: batchId, params: paramsWithUser, batchSize };
-    const isFirstInQueue = queue.length === 0;
 
-    const placeholderIds = Array.from({ length: batchSize }, (_, i) => `ph-${batchId}-${i}`);
-    const placeholders: GridItem[] = placeholderIds.map((id) => ({
-      type: 'placeholder',
-      id,
-      status: isFirstInQueue ? ('generating' as const) : ('queued' as const),
-      aspectRatio: params.aspectRatio,
-      imageSize: params.imageSize
-    }));
+    const jobs: QueuedJob[] = [];
+    const placeholders: GridItem[] = [];
+
+    for (let i = 0; i < batchSize; i++) {
+      const id = nextJobId();
+      jobs.push({ id, params: paramsWithUser });
+      placeholders.push({
+        type: 'placeholder',
+        id,
+        status: 'queued' as const,
+        aspectRatio: params.aspectRatio,
+        imageSize: params.imageSize,
+      });
+    }
 
     setGridItems((prev) => [...placeholders, ...prev]);
-    setQueue((q) => [...q, batch]);
-  }, [queue, user?.id]);
+    setQueue((q) => [...q, ...jobs]);
+  }, [user?.id]);
 
   const handleImageClick = useCallback((index: number) => {
     setSelectedImageIndex(index);
@@ -339,7 +339,7 @@ function App() {
       )}
 
       {/* Loading indicator */}
-      {isProcessing && (
+      {runningCount > 0 && (
         <div className="fixed top-20 right-6 z-50">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
@@ -451,7 +451,7 @@ function App() {
         <div className="flex justify-center">
           <ControlPanel
             onGenerate={handleGenerate}
-            isGenerating={isProcessing}
+            isGenerating={runningCount > 0}
             promptToInject={promptToInject}
             onPromptInjected={handlePromptInjected}
             referenceImageUrlToInject={referenceImageUrlToInject}
