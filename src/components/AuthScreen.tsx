@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 
-type Mode = 'signin' | 'signup';
+type Mode = 'signin' | 'signup' | 'forgot';
 
 interface AuthScreenProps {
   onSignIn: (email: string, password: string) => Promise<void>;
   onSignUp: (email: string, password: string, username?: string) => Promise<void>;
+  onResetPassword: (email: string) => Promise<void>;
 }
 
-const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
+const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, onResetPassword }) => {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +21,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!email.trim() || !password.trim()) {
+    if (!email.trim()) {
+      setError('Please enter your email');
+      return;
+    }
+    if (mode !== 'forgot' && !password.trim()) {
       setError('Please enter email and password');
       return;
     }
@@ -33,8 +38,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
       if (mode === 'signup') {
         await onSignUp(email, password, username.trim());
         setMessage('Check your email to confirm your account.');
-      } else {
+      } else if (mode === 'signin') {
         await onSignIn(email, password);
+      } else {
+        await onResetPassword(email);
+        setMessage('Check your email for a password reset link.');
+        setMode('signin');
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -103,21 +112,32 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
                   className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
                 />
               </div>
-              <div>
-                <label htmlFor="password" className="block text-white/80 text-sm mb-1.5">Password</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  placeholder="••••••••"
-                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-                />
-                {mode === 'signup' && (
-                  <p className="text-white/40 text-xs mt-1">At least 6 characters</p>
-                )}
-              </div>
+              {mode !== 'forgot' && (
+                <div>
+                  <label htmlFor="password" className="block text-white/80 text-sm mb-1.5">Password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                    placeholder="••••••••"
+                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                  />
+                  {mode === 'signup' && (
+                    <p className="text-white/40 text-xs mt-1">At least 6 characters</p>
+                  )}
+                  {mode === 'signin' && (
+                    <button
+                      type="button"
+                      onClick={() => { setMode('forgot'); setError(null); setMessage(null); }}
+                      className="mt-2 text-xs text-blue-300 hover:text-blue-200"
+                    >
+                      Forgot your password?
+                    </button>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <div className="bg-red-500/20 border border-red-500/30 rounded-xl px-4 py-2 text-red-300 text-sm">
@@ -135,12 +155,18 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
                 disabled={loading}
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Please wait...' : mode === 'signup' ? 'Create account' : 'Sign in'}
+                {loading
+                  ? 'Please wait...'
+                  : mode === 'signup'
+                    ? 'Create account'
+                    : mode === 'signin'
+                      ? 'Sign in'
+                      : 'Send reset link'}
               </button>
             </form>
 
             <p className="text-center text-white/50 text-sm mt-6">
-              {mode === 'signin' ? (
+              {mode === 'signin' && (
                 <>
                   Don&apos;t have an account?{' '}
                   <button
@@ -151,7 +177,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
                     Sign up
                   </button>
                 </>
-              ) : (
+              )}
+              {mode === 'signup' && (
                 <>
                   Already have an account?{' '}
                   <button
@@ -160,6 +187,18 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp }) => {
                     className="text-blue-400 hover:text-blue-300 font-medium"
                   >
                     Sign in
+                  </button>
+                </>
+              )}
+              {mode === 'forgot' && (
+                <>
+                  Remembered your password?{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setMode('signin'); setError(null); setMessage(null); }}
+                    className="text-blue-400 hover:text-blue-300 font-medium"
+                  >
+                    Back to sign in
                   </button>
                 </>
               )}

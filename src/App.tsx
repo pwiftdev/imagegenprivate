@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type FormEvent } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ImageGrid, { type CreatorInfo } from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
@@ -30,8 +30,103 @@ function nextJobId() {
   return `job-${++jobIdCounter}`;
 }
 
+interface ResetPasswordScreenProps {
+  onSubmit: (password: string) => Promise<void>;
+}
+
+function ResetPasswordScreen({ onSubmit }: ResetPasswordScreenProps) {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    if (!password.trim() || password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSubmit(password);
+      setMessage('Password updated. You can now continue using Kreator.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="w-full max-w-md px-6">
+        <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-white/5 backdrop-blur-xl p-6">
+          <h1 className="text-xl font-semibold text-white mb-2">Set a new password</h1>
+          <p className="text-white/60 text-sm mb-4">
+            Enter a new password for your Kreator account.
+          </p>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label htmlFor="new-password" className="block text-white/80 text-sm mb-1.5">
+                New password
+              </label>
+              <input
+                id="new-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+              />
+            </div>
+            <div>
+              <label htmlFor="confirm-password" className="block text-white/80 text-sm mb-1.5">
+                Confirm password
+              </label>
+              <input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+              />
+            </div>
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/30 rounded-xl px-4 py-2 text-red-300 text-sm">
+                {error}
+              </div>
+            )}
+            {message && (
+              <div className="bg-green-500/20 border border-green-500/30 rounded-xl px-4 py-2 text-green-300 text-sm">
+                {message}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Updating...' : 'Update password'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
-  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
   const [gridItems, setGridItems] = useState<GridItem[]>([]);
   const [queue, setQueue] = useState<QueuedJob[]>([]);
   const [runningCount, setRunningCount] = useState(0);
@@ -48,8 +143,15 @@ function App() {
   const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
   const [hasMoreImages, setHasMoreImages] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      setIsRecoveryMode(true);
+    }
+  }, []);
 
   // Load current user's profile (creator info + credits)
   const refetchCredits = useCallback(async () => {
@@ -341,11 +443,26 @@ function App() {
     );
   }
 
+  if (isRecoveryMode && user) {
+    return (
+      <ResetPasswordScreen
+        onSubmit={async (newPassword) => {
+          await updatePassword(newPassword);
+          setIsRecoveryMode(false);
+          if (typeof window !== 'undefined') {
+            window.location.hash = '';
+          }
+        }}
+      />
+    );
+  }
+
   if (!user) {
     return (
       <AuthScreen
         onSignIn={async (email, password) => { await signIn(email, password); }}
         onSignUp={async (email, password, username) => { await signUp(email, password, username); }}
+        onResetPassword={async (email) => { await resetPassword(email); }}
       />
     );
   }
