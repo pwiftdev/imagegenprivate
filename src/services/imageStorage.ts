@@ -59,8 +59,6 @@ export async function uploadReferenceImages(base64DataUrls: string[]): Promise<s
   return urls;
 }
 
-const GRID_THUMB_WIDTH = 400;
-
 export interface StoredImage {
   id: string;
   created_at: string;
@@ -115,13 +113,10 @@ export async function saveImageToSupabase(
     throw new Error(`Upload failed: ${uploadError.message}`);
   }
 
-  // Get public URL (full + thumbnail)
+  // Get public URL (use same URL for grid + modal; no Supabase transforms)
   const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
-  const { data: thumbData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath, {
-    transform: { width: GRID_THUMB_WIDTH, quality: 80, resize: 'contain' },
-  });
   const publicUrl = urlData.publicUrl;
-  const thumbUrl = thumbData.publicUrl;
+  const thumbUrl = publicUrl;
 
   const { data: { user } } = await supabase.auth.getUser();
   const insertPayload: Record<string, unknown> = {
@@ -169,11 +164,8 @@ export async function saveImageMetadataToSupabase(
   }
 
   const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
-  const { data: thumbData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath, {
-    transform: { width: GRID_THUMB_WIDTH, quality: 80, resize: 'contain' },
-  });
   const publicUrl = urlData.publicUrl;
-  const thumbUrl = thumbData.publicUrl;
+  const thumbUrl = publicUrl;
 
   const { data: { user } } = await supabase.auth.getUser();
   const insertPayload: Record<string, unknown> = {
@@ -279,16 +271,11 @@ export async function fetchImagesFromSupabase(
     const { data: urlData } = client.storage
       .from(BUCKET_NAME)
       .getPublicUrl(r.storage_path);
-    const { data: thumbData } = client.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(r.storage_path, {
-        transform: { width: GRID_THUMB_WIDTH, quality: 80, resize: 'contain' },
-      });
 
     return {
       ...r,
       url: urlData.publicUrl,
-      thumbUrl: thumbData.publicUrl,
+      thumbUrl: urlData.publicUrl,
     } as StoredImage;
   });
 
