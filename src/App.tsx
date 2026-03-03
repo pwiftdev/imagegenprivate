@@ -502,8 +502,8 @@ function App() {
         </div>
       )}
 
-      {/* Content container - single wrapper for alignment */}
-      <div className="w-full max-w-7xl mx-auto px-6">
+      {/* Content container - full-width */}
+      <div className="w-full px-6">
         {/* Dashboard header + stats (mine view) or simple header (all view) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-6 pt-6">
           <div>
