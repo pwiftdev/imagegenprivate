@@ -253,7 +253,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
 
           {/* Info bar */}
-          <div className="relative z-10 px-6 py-3 border-b border-white/10 bg-blue-500/5 overflow-hidden">
+          <div className="relative z-10 px-6 py-3 border-b border-white/10 bg-blue-600 overflow-hidden">
             <div className="info-bar-shimmer" />
             <div className="relative flex items-center justify-between gap-3">
               <p className="text-white/70 text-sm flex-1">
@@ -465,22 +465,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </button>
             </div>
 
-            {/* Picker Modal */}
-            {openPicker && (
-              <div
-                className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                onClick={() => setOpenPicker(null)}
-              >
-                <div
-                  className="relative w-full max-w-lg mx-4 rounded-2xl backdrop-blur-xl bg-gradient-to-b from-white/15 via-white/10 to-white/5 border border-white/20 shadow-2xl overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-400/10 pointer-events-none" />
+            {/* Picker for aspect ratio & quality - anchored to bottom of panel */}
+            {(openPicker === 'aspect' || openPicker === 'quality') && (
+              <div className="absolute inset-x-0 bottom-0 z-40">
+                <div className="relative w-full rounded-b-3xl bg-gradient-to-b from-blue-900/95 via-blue-800/95 to-blue-800/95 border-t border-blue-400/40 shadow-2xl overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-blue-400/30 pointer-events-none" />
                   <div className="relative z-10 p-6">
                     <h3 className="text-white font-semibold mb-4">
                       {openPicker === 'aspect' && 'Choose aspect ratio'}
                       {openPicker === 'quality' && 'Choose resolution'}
-                      {openPicker === 'model' && 'Choose AI model'}
                     </h3>
                     <div className="flex gap-2 flex-wrap">
                       {openPicker === 'aspect' &&
@@ -513,21 +506,47 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             {quality}
                           </button>
                         ))}
-                      {openPicker === 'model' &&
-                        MODEL_IDS.map((modelId) => (
-                          <button
-                            key={modelId}
-                            type="button"
-                            onClick={() => { setSelectedModel(modelId); setOpenPicker(null); }}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                              selectedModel === modelId
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
-                            }`}
-                          >
-                            {IMAGE_MODELS[modelId]}
-                          </button>
-                        ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOpenPicker(null)}
+                      className="mt-4 text-white/60 hover:text-white text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Model picker keeps full-screen modal behavior */}
+            {openPicker === 'model' && (
+              <div
+                className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                onClick={() => setOpenPicker(null)}
+              >
+                <div
+                  className="relative w-full max-w-lg mx-4 rounded-2xl backdrop-blur-xl bg-gradient-to-b from-white/15 via-white/10 to-white/5 border border-white/20 shadow-2xl overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-400/10 pointer-events-none" />
+                  <div className="relative z-10 p-6">
+                    <h3 className="text-white font-semibold mb-4">Choose AI model</h3>
+                    <div className="flex gap-2 flex-wrap">
+                      {MODEL_IDS.map((modelId) => (
+                        <button
+                          key={modelId}
+                          type="button"
+                          onClick={() => { setSelectedModel(modelId); setOpenPicker(null); }}
+                          className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                            selectedModel === modelId
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
+                          }`}
+                        >
+                          {IMAGE_MODELS[modelId]}
+                        </button>
+                      ))}
                     </div>
                     <button
                       type="button"
