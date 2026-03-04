@@ -225,16 +225,20 @@ export async function fetchImagesFromSupabase(
   let rows: Record<string, unknown>[] | null = null;
   let error: Error | null = null;
 
+  // Resolve user once for scope (avoids duplicate auth calls)
+  let userId: string | undefined;
+  if (scope === 'mine') {
+    const { data: { user } } = await supabase.auth.getUser();
+    userId = user?.id;
+  }
+
   // Try with reference_image_urls first (requires migration)
   let query = supabase
     .from('images')
     .select(`${baseSelect}, reference_image_urls`, { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
-  if (scope === 'mine') {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id) query = query.eq('user_id', user.id);
-  }
+  if (userId) query = query.eq('user_id', userId);
   const result1 = await query;
   if (!result1.error) {
     rows = (result1.data ?? null) as Record<string, unknown>[] | null;
@@ -245,10 +249,7 @@ export async function fetchImagesFromSupabase(
       .select(baseSelect, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
-    if (scope === 'mine') {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.id) query2 = query2.eq('user_id', user.id);
-    }
+    if (userId) query2 = query2.eq('user_id', userId);
     const result2 = await query2;
     rows = (result2.data ?? null) as Record<string, unknown>[] | null;
     error = result2.error as Error | null;

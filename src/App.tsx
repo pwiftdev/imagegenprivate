@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ImageGrid, { type CreatorInfo } from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
 import ImageModal from './components/ImageModal';
 import AuthScreen from './components/AuthScreen';
+import LeftToolPanel from './components/LeftToolPanel';
 import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { generateImage, getActiveJobIds, pollJobUntilComplete } from './services/imageGeneration';
@@ -146,6 +147,7 @@ function App() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const imageCountRef = useRef(0);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
@@ -174,6 +176,15 @@ function App() {
   useEffect(() => {
     void refetchCredits();
   }, [refetchCredits]);
+
+  const filteredGridItems = useMemo(() => {
+    if (qualityFilter === 'All') return gridItems;
+    return gridItems.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
+  }, [gridItems, qualityFilter]);
+
+  useEffect(() => {
+    imageCountRef.current = gridItems.filter((i) => i.type === 'image').length;
+  }, [gridItems]);
 
   // Load images from Supabase (paginated, refetch when viewMode/refreshKey changes)
   useEffect(() => {
@@ -219,10 +230,10 @@ function App() {
 
   const loadMoreImages = useCallback(async () => {
     if (!user || isLoadingMore || !hasMoreImages) return;
+    const offset = imageCountRef.current;
     setIsLoadingMore(true);
     try {
-      const currentImages = gridItems.filter((i): i is Extract<GridItem, { type: 'image' }> => i.type === 'image');
-      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 24, offset: currentImages.length });
+      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 24, offset });
       const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
       const creatorMap = await fetchProfilesByIds(userIds);
       const moreImages: GridItem[] = stored.map((img) => ({
@@ -244,7 +255,7 @@ function App() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [user?.id, viewMode, gridItems, hasMoreImages, isLoadingMore]);
+  }, [user?.id, viewMode, hasMoreImages, isLoadingMore]);
 
   // Infinite scroll: load more when sentinel enters viewport
   useEffect(() => {
@@ -411,6 +422,11 @@ function App() {
     setSelectedImageIndex(null);
   }, []);
 
+  const handleAddToReference = useCallback((url: string) => {
+    setReferenceImageUrlToInject(url);
+    setControlPanelOpen(true);
+  }, []);
+
   const handlePromptInjected = useCallback(() => {
     setPromptToInject(null);
   }, []);
@@ -474,6 +490,15 @@ function App() {
         <Route path="/profile" element={<ProfilePage user={user} />} />
         <Route path="/" element={
     <div className="min-h-screen bg-black pb-32 pt-24">
+      {/* Left pill tool panel - popup with placeholder feature buttons */}
+      <LeftToolPanel
+        onOpenCreate={() => setControlPanelOpen(true)}
+        onUseKreatePlusPrompt={(prompt) => {
+          setPromptToInject(prompt);
+          setControlPanelOpen(true);
+        }}
+      />
+
       {/* Error notification */}
       {error && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
@@ -548,10 +573,7 @@ function App() {
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/30 border-t-white"></div>
           </div>
         ) : (() => {
-          const filteredItems = qualityFilter === 'All'
-            ? gridItems
-            : gridItems.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
-          return filteredItems.length === 0 ? (
+          return filteredGridItems.length === 0 ? (
             <div className="flex items-center justify-center min-h-[60vh] text-white/40 text-center px-4">
               <div>
                 <svg className="w-24 h-24 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -574,10 +596,10 @@ function App() {
           ) : (
             <>
               <ImageGrid
-                items={filteredItems}
+                items={filteredGridItems}
                 onImageClick={handleImageClick}
                 onReRun={handleReRun}
-                onAddToReference={(url) => { setReferenceImageUrlToInject(url); setControlPanelOpen(true); }}
+                onAddToReference={handleAddToReference}
               />
               {hasMoreImages && (
                 <div ref={loadMoreSentinelRef} className="flex justify-center py-8 min-h-12">
@@ -627,25 +649,22 @@ function App() {
 
       {/* Image Modal */}
       {selectedImageIndex !== null && (() => {
-        const filteredItems = qualityFilter === 'All'
-          ? gridItems
-          : gridItems.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
-        const item = filteredItems[selectedImageIndex];
+        const item = filteredGridItems[selectedImageIndex];
         if (!item || item.type !== 'image') return null;
-        const imageItems = filteredItems.filter((i): i is Extract<typeof i, { type: 'image' }> => i.type === 'image');
+        const imageItems = filteredGridItems.filter((i): i is Extract<typeof item, { type: 'image' }> => i.type === 'image');
         const currentImageIdx = imageItems.findIndex((i) => i.id === item.id);
         const hasPrev = currentImageIdx > 0;
         const hasNext = currentImageIdx >= 0 && currentImageIdx < imageItems.length - 1;
         const onPrev = () => {
           if (currentImageIdx <= 0) return;
           const prevItem = imageItems[currentImageIdx - 1];
-          const idx = filteredItems.findIndex((i) => i.type === 'image' && i.id === prevItem.id);
+          const idx = filteredGridItems.findIndex((i) => i.type === 'image' && i.id === prevItem.id);
           if (idx >= 0) setSelectedImageIndex(idx);
         };
         const onNext = () => {
           if (currentImageIdx < 0 || currentImageIdx >= imageItems.length - 1) return;
           const nextItem = imageItems[currentImageIdx + 1];
-          const idx = filteredItems.findIndex((i) => i.type === 'image' && i.id === nextItem.id);
+          const idx = filteredGridItems.findIndex((i) => i.type === 'image' && i.id === nextItem.id);
           if (idx >= 0) setSelectedImageIndex(idx);
         };
         return (

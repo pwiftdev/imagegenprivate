@@ -16,22 +16,34 @@ export interface Profile {
 const AVATARS_BUCKET = 'generated-images';
 const AVATARS_PATH_PREFIX = 'avatars/';
 
+// In-memory cache for profile lookups (avoids refetching on load more / filter)
+const profileCache = new Map<string, { username: string; avatar_url: string | null }>();
+
 export async function fetchProfilesByIds(userIds: string[]): Promise<Map<string, { username: string; avatar_url: string | null }>> {
   const map = new Map<string, { username: string; avatar_url: string | null }>();
   if (!supabase || userIds.length === 0) return map;
 
-  const unique = [...new Set(userIds.filter(Boolean))];
+  const unique = [...new Set(userIds.filter(Boolean))] as string[];
+  const toFetch = unique.filter((id) => !profileCache.has(id));
+
+  // Return cached for all requested
+  for (const id of unique) {
+    const cached = profileCache.get(id);
+    if (cached) map.set(id, cached);
+  }
+
+  if (toFetch.length === 0) return map;
+
   const { data, error } = await supabase
     .from('profiles')
     .select('id, username, avatar_url')
-    .in('id', unique);
+    .in('id', toFetch);
 
   if (error) return map;
   for (const p of data || []) {
-    map.set(p.id, {
-      username: p.username || 'Creator',
-      avatar_url: p.avatar_url,
-    });
+    const entry = { username: p.username || 'Creator', avatar_url: p.avatar_url };
+    profileCache.set(p.id, entry);
+    map.set(p.id, entry);
   }
   return map;
 }

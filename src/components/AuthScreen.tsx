@@ -53,7 +53,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, onResetPass
   };
 
   return (
-    <div className="min-h-screen h-screen flex bg-black relative">
+    <div className="min-h-screen h-screen flex items-center bg-black relative">
       {/* Full-screen background - goes behind everything */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -67,7 +67,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, onResetPass
       <div
         className={`
           w-full md:w-[420px] flex-shrink-0
-          md:min-h-screen md:h-screen
+          md:min-h-[88vh] md:h-[88vh] md:self-center
           md:rounded-l-3xl
           flex flex-col justify-center
           md:border-l border-white/20
