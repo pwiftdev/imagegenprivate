@@ -29,11 +29,11 @@ const PlaceholderCard = memo(function PlaceholderCard({ item }: { item: Extract<
   const isGenerating = item.status === 'generating';
   return (
     <div
-      className="animate-pop-in relative overflow-hidden flex items-center justify-center rounded-lg backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-xl"
+      className="animate-pop-in relative overflow-hidden flex items-center justify-center backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-xl"
       style={{ aspectRatio: parseAspectRatio(item.aspectRatio), animationDelay: `${hashToDelay(item.id, 400)}ms` }}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-50 rounded-lg" />
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent rounded-t-lg" />
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-50" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       <div className="relative z-10 flex flex-col items-center gap-3">
         {isGenerating ? (
           <>
@@ -74,7 +74,7 @@ const ImageCard = memo(function ImageCard({ item, index, onImageClick, onReRun, 
 
   return (
     <div
-      className="animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] rounded-lg"
+      className="animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.08]"
       style={{ aspectRatio: parseAspectRatio(item.aspectRatio), animationDelay: `${hashToDelay(item.id, 400)}ms` }}
       onClick={handleClick}
     >
@@ -84,7 +84,7 @@ const ImageCard = memo(function ImageCard({ item, index, onImageClick, onReRun, 
         loading="lazy"
         decoding="async"
         fetchPriority={index < 6 ? 'high' : 'low'}
-        className="absolute inset-0 w-full h-full object-cover rounded-lg"
+        className="absolute inset-0 w-full h-full object-cover"
         onError={(e) => {
           const target = e.target as HTMLImageElement;
           if (item.thumbUrl && target.src !== item.url) {
@@ -127,7 +127,7 @@ const ImageCard = memo(function ImageCard({ item, index, onImageClick, onReRun, 
 const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onReRun, onAddToReference }) => {
   return (
     <div className="w-full">
-      <Masonry columns={{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing={1.5} sx={{ width: '100%' }}>
+      <Masonry columns={{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing={1} sx={{ width: '100%' }}>
         {items.map((item, index) =>
           item.type === 'placeholder' ? (
             <PlaceholderCard key={item.id} item={item} />

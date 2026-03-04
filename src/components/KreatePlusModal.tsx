@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { enhancePrompt } from '../services/promptEnhancer';
 
 const easing = 'cubic-bezier(0.32, 0.72, 0, 1)';
