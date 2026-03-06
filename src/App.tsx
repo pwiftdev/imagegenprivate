@@ -412,6 +412,7 @@ function App() {
 
     setGridItems((prev) => [...placeholders, ...prev]);
     setQueue((q) => [...q, ...jobs]);
+    setCredits((c) => (c !== null ? Math.max(0, c - batchSize) : c));
   }, [user?.id]);
 
   const handleImageClick = useCallback((index: number) => {
