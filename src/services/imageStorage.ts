@@ -199,7 +199,7 @@ export async function saveImageMetadataToSupabase(
 
 export type ImageScope = 'mine' | 'all';
 
-const DEFAULT_PAGE_SIZE = 24;
+const DEFAULT_PAGE_SIZE = 12;
 
 export interface FetchImagesResult {
   images: StoredImage[];

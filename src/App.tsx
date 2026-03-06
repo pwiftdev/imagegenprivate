@@ -192,7 +192,7 @@ function App() {
     async function load() {
       setIsLoading(true);
       try {
-        const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 24, offset: 0 });
+        const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 12, offset: 0 });
         const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
         const creatorMap = await fetchProfilesByIds(userIds);
         const newImages: GridItem[] = stored
@@ -233,7 +233,7 @@ function App() {
     const offset = imageCountRef.current;
     setIsLoadingMore(true);
     try {
-      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 24, offset });
+      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 12, offset });
       const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
       const creatorMap = await fetchProfilesByIds(userIds);
       const moreImages: GridItem[] = stored.map((img) => ({

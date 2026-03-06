@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useState, useEffect, useRef } from 'react';
 import Masonry from '@mui/lab/Masonry';
 
 export type CreatorInfo = { username: string; avatar_url: string | null };
@@ -62,6 +62,22 @@ interface ImageCardProps {
 }
 
 const ImageCard = memo(function ImageCard({ item, index, onImageClick, onReRun, onAddToReference }: ImageCardProps) {
+  const [inView, setInView] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setInView(true);
+      },
+      { rootMargin: '200px', threshold: 0.01 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const handleClick = useCallback(() => onImageClick?.(index), [index, onImageClick]);
   const handleReRun = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -74,26 +90,31 @@ const ImageCard = memo(function ImageCard({ item, index, onImageClick, onReRun, 
 
   return (
     <div
+      ref={cardRef}
       className="animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.08]"
       style={{ aspectRatio: parseAspectRatio(item.aspectRatio), animationDelay: `${hashToDelay(item.id, 400)}ms` }}
       onClick={handleClick}
     >
-      <img
-        src={item.thumbUrl || item.url}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        fetchPriority={index < 6 ? 'high' : 'low'}
-        className="absolute inset-0 w-full h-full object-cover"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          if (item.thumbUrl && target.src !== item.url) {
-            target.src = item.url;
-          } else {
-            target.src = `https://via.placeholder.com/400x400/1a1a1a/666666?text=Image+${index + 1}`;
-          }
-        }}
-      />
+      {inView ? (
+        <img
+          src={item.thumbUrl || item.url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          fetchPriority={index < 6 ? 'high' : 'low'}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            if (item.thumbUrl && target.src !== item.url) {
+              target.src = item.url;
+            } else {
+              target.src = `https://via.placeholder.com/400x400/1a1a1a/666666?text=Image+${index + 1}`;
+            }
+          }}
+        />
+      ) : (
+        <div className="absolute inset-0 w-full h-full bg-gray-800/90 animate-pulse" aria-hidden />
+      )}
       {item.creator && (
         <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-sm rounded-full px-1.5 py-0.5 max-w-[90%]">
           {item.creator.avatar_url ? (
