@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { compressImageForReference, compressImageFromUrl } from '../utils/compressImage';
 import { enhancePrompt } from '../services/promptEnhancer';
-import { uploadReferenceImages } from '../services/imageStorage';
 import type { ImageGenerationParams, ImageModelId } from '../services/imageGeneration';
 import { IMAGE_MODELS } from '../services/imageGeneration';
 
@@ -211,28 +210,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   }, [prompt]);
 
-  const [isUploadingRefs, setIsUploadingRefs] = useState(false);
-
-  const handleGenerateClick = useCallback(async () => {
+  const handleGenerateClick = useCallback(() => {
     if (!onGenerate) return;
 
-    let params: ImageGenerationParams = {
+    const params: ImageGenerationParams = {
       prompt,
       aspectRatio: selectedAspectRatio,
       imageSize: selectedQuality,
       model: selectedModel,
     };
-
     if (referenceImagesBase64.length > 0) {
-      setIsUploadingRefs(true);
-      try {
-        const urls = await uploadReferenceImages(referenceImagesBase64);
-        params.referenceImageUrls = urls;
-      } catch {
-        params.referenceImages = referenceImagesBase64;
-      } finally {
-        setIsUploadingRefs(false);
-      }
+      params.referenceImages = referenceImagesBase64;
     }
 
     onGenerate(params, batchSize);
@@ -451,17 +439,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               )}
               <button
                 onClick={() => void handleGenerateClick()}
-                disabled={!prompt.trim() || isUploadingRefs || (typeof credits === 'number' && credits < batchSize)}
+                disabled={!prompt.trim() || (typeof credits === 'number' && credits < batchSize)}
                 title={typeof credits === 'number' && credits < batchSize ? 'Not enough credits' : undefined}
                 className="ml-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
               >
-                {(isGenerating || isUploadingRefs) ? (
-                  <span>Kreating...</span>
-                ) : (
-                  <>
-                    <span>Kreate{batchSize > 1 ? ` +${batchSize}` : ''}</span>
-                  </>
-                )}
+                <span>Kreate{batchSize > 1 ? ` +${batchSize}` : ''}</span>
               </button>
             </div>
 
