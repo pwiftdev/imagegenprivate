@@ -67,10 +67,11 @@ export interface StoredImage {
   aspect_ratio: string | null;
   image_size: string | null;
   storage_path: string;
+  thumb_storage_path?: string | null;
   file_name: string | null;
   reference_image_urls?: string[] | null;
   url: string; // Full quality URL (for modal)
-  thumbUrl?: string; // Smaller thumbnail URL (for grid, faster load)
+  thumbUrl?: string; // Thumbnail URL (for grid), from thumb_storage_path or full URL
 }
 
 /**
@@ -150,14 +151,16 @@ export async function saveImageToSupabase(
 }
 
 /**
- * Save metadata only - image already in Supabase Storage (uploaded by backend)
+ * Save metadata only - image already in Supabase Storage (uploaded by backend).
+ * Pass thumbStoragePath when backend created a thumbnail.
  */
 export async function saveImageMetadataToSupabase(
   storagePath: string,
   prompt: string,
   aspectRatio: string,
   imageSize: string,
-  referenceImageUrls?: string[]
+  referenceImageUrls?: string[],
+  thumbStoragePath?: string | null
 ): Promise<StoredImage> {
   if (!supabase) {
     throw new Error('Supabase is not configured');
@@ -165,7 +168,9 @@ export async function saveImageMetadataToSupabase(
 
   const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
   const publicUrl = urlData.publicUrl;
-  const thumbUrl = publicUrl;
+  const thumbUrl = thumbStoragePath
+    ? supabase.storage.from(BUCKET_NAME).getPublicUrl(thumbStoragePath).data.publicUrl
+    : publicUrl;
 
   const { data: { user } } = await supabase.auth.getUser();
   const insertPayload: Record<string, unknown> = {
@@ -175,6 +180,7 @@ export async function saveImageMetadataToSupabase(
     storage_path: storagePath,
     file_name: storagePath,
   };
+  if (thumbStoragePath) insertPayload.thumb_storage_path = thumbStoragePath;
   if (user?.id) insertPayload.user_id = user.id;
   if (referenceImageUrls && referenceImageUrls.length > 0) {
     insertPayload.reference_image_urls = referenceImageUrls;
@@ -222,6 +228,7 @@ export async function fetchImagesFromSupabase(
   const offset = options?.offset ?? 0;
 
   const baseSelect = 'id, created_at, user_id, prompt, aspect_ratio, image_size, storage_path, file_name';
+  const baseSelectWithThumb = `${baseSelect}, thumb_storage_path`;
   let rows: Record<string, unknown>[] | null = null;
   let error: Error | null = null;
 
@@ -232,10 +239,10 @@ export async function fetchImagesFromSupabase(
     userId = user?.id;
   }
 
-  // Try with reference_image_urls first (requires migration)
+  // Try with thumb_storage_path + reference_image_urls first
   let query = supabase
     .from('images')
-    .select(`${baseSelect}, reference_image_urls`, { count: 'exact' })
+    .select(`${baseSelectWithThumb}, reference_image_urls`, { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (userId) query = query.eq('user_id', userId);
@@ -243,7 +250,7 @@ export async function fetchImagesFromSupabase(
   if (!result1.error) {
     rows = (result1.data ?? null) as Record<string, unknown>[] | null;
   } else {
-    // Fallback: column may not exist yet
+    // Fallback: thumb_storage_path or reference_image_urls column may not exist yet
     let query2 = supabase
       .from('images')
       .select(baseSelect, { count: 'exact' })
@@ -268,15 +275,17 @@ export async function fetchImagesFromSupabase(
   if (!client) return { images: [], hasMore: false };
 
   const images = (rows || []).map((row) => {
-    const r = row as { storage_path: string; [k: string]: unknown };
-    const { data: urlData } = client.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(r.storage_path);
+    const r = row as { storage_path: string; thumb_storage_path?: string | null; [k: string]: unknown };
+    const { data: urlData } = client.storage.from(BUCKET_NAME).getPublicUrl(r.storage_path);
+    const thumbPath = r.thumb_storage_path && typeof r.thumb_storage_path === 'string'
+      ? r.thumb_storage_path
+      : r.storage_path;
+    const { data: thumbUrlData } = client.storage.from(BUCKET_NAME).getPublicUrl(thumbPath);
 
     return {
       ...r,
       url: urlData.publicUrl,
-      thumbUrl: urlData.publicUrl,
+      thumbUrl: thumbUrlData.publicUrl,
     } as StoredImage;
   });
 

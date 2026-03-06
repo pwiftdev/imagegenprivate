@@ -30,6 +30,8 @@ export interface GeneratedImage {
   id: string;
   url: string;
   storagePath?: string;
+  thumbUrl?: string;
+  thumbStoragePath?: string;
   base64Data: string;
   timestamp: number;
   prompt: string;
@@ -74,7 +76,7 @@ async function sleep(ms: number): Promise<void> {
 }
 
 function parseResult(
-  data: { id?: string; url?: string; storagePath?: string; base64Data?: string; prompt?: string; aspectRatio?: string; imageSize?: string },
+  data: { id?: string; url?: string; storagePath?: string; thumbUrl?: string; thumbStoragePath?: string; base64Data?: string; prompt?: string; aspectRatio?: string; imageSize?: string },
   params: ImageGenerationParams
 ): GeneratedImage {
   const resolvedPrompt = data.prompt || params.prompt;
@@ -85,6 +87,8 @@ function parseResult(
       id: data.id || `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       url: data.url,
       storagePath: data.storagePath,
+      thumbUrl: data.thumbUrl ?? data.url,
+      thumbStoragePath: data.thumbStoragePath,
       base64Data: '',
       timestamp: Date.now(),
       prompt: resolvedPrompt,

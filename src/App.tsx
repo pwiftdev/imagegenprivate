@@ -324,7 +324,7 @@ function App() {
             type: 'image',
             id: img.id,
             url: img.url,
-            thumbUrl: undefined,
+            thumbUrl: img.thumbUrl ?? img.url,
             aspectRatio: img.aspectRatio,
               prompt: img.prompt,
               imageSize: img.imageSize,
@@ -335,7 +335,7 @@ function App() {
           } else {
             try {
               const stored = img.storagePath
-                ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls)
+                ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls, img.thumbStoragePath)
                 : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls);
               gridImage = {
                 type: 'image',
