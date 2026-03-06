@@ -633,7 +633,6 @@ function App() {
         <div className="flex justify-center">
           <ControlPanel
             onGenerate={handleGenerate}
-            isGenerating={runningCount > 0}
             credits={credits}
             promptToInject={promptToInject}
             onPromptInjected={handlePromptInjected}

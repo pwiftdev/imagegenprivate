@@ -6,7 +6,6 @@ import { IMAGE_MODELS } from '../services/imageGeneration';
 
 interface ControlPanelProps {
   onGenerate?: (params: ImageGenerationParams, batchSize: number) => void;
-  isGenerating?: boolean;
   credits?: number | null;
   promptToInject?: string | null;
   onPromptInjected?: () => void;
@@ -26,7 +25,6 @@ const MAX_REFERENCE_IMAGES = 6;
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
   onGenerate,
-  isGenerating = false,
   credits,
   promptToInject,
   onPromptInjected,
