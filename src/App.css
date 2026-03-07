@@ -221,36 +221,34 @@
   transform: scale(1);
 }
 
-/* Showcase marquee: 3 rows, left / right / left — GPU-accelerated for smooth scroll */
-@keyframes landing-showcase-scroll-left {
+/* Showcase: 3 columns, vertical auto-scroll — GPU-only, no blur, to avoid stutter */
+@keyframes landing-showcase-col-down {
   from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, -50%, 0); }
 }
-@keyframes landing-showcase-scroll-right {
-  from { transform: translate3d(-50%, 0, 0); }
+@keyframes landing-showcase-col-up {
+  from { transform: translate3d(0, -50%, 0); }
   to { transform: translate3d(0, 0, 0); }
 }
-.landing-showcase-marquee-left,
-.landing-showcase-marquee-right {
+.landing-showcase-col-track {
   will-change: transform;
   backface-visibility: hidden;
   animation-timing-function: linear;
+  animation-iteration-count: infinite;
   contain: layout style paint;
-  transform: translateZ(0);
 }
-.landing-showcase-marquee-left {
-  animation-name: landing-showcase-scroll-left;
-  animation-duration: 72s;
-  animation-iteration-count: infinite;
+.landing-showcase-col-track-down {
+  animation-name: landing-showcase-col-down;
+  animation-duration: 45s;
 }
-.landing-showcase-marquee-right {
-  animation-name: landing-showcase-scroll-right;
-  animation-duration: 80s;
-  animation-iteration-count: infinite;
+.landing-showcase-col-track-up {
+  animation-name: landing-showcase-col-up;
+  animation-duration: 50s;
 }
 
-.landing-showcase-row {
+.landing-showcase-col {
   contain: layout paint;
+  overflow: hidden;
 }
 
 /* Smooth edge fade: gradient only (no backdrop-blur) to avoid stutter when content scrolls behind */
