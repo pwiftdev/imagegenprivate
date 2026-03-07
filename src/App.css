@@ -102,6 +102,20 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes landing-hero-word-swap {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.landing-hero-word-swap {
+  animation: landing-hero-word-swap 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 @keyframes landing-gradient-shift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -141,6 +155,11 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Hero rotating word: run swap animation + keep gradient (gradient-text’s animation would override otherwise) */
+.landing-hero-word-swap.landing-gradient-text {
+  animation: landing-hero-word-swap 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards, landing-gradient-shift 6s ease infinite;
 }
 
 .landing-credits-border {
@@ -200,4 +219,78 @@
 .landing-scroll-reveal.landing-in-view .landing-showcase-cell {
   opacity: 1;
   transform: scale(1);
+}
+
+/* Showcase marquee: 3 rows, left / right / left — GPU-accelerated for smooth scroll */
+@keyframes landing-showcase-scroll-left {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+@keyframes landing-showcase-scroll-right {
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+.landing-showcase-marquee-left,
+.landing-showcase-marquee-right {
+  will-change: transform;
+  backface-visibility: hidden;
+  animation-timing-function: linear;
+  contain: layout style paint;
+  transform: translateZ(0);
+}
+.landing-showcase-marquee-left {
+  animation-name: landing-showcase-scroll-left;
+  animation-duration: 72s;
+  animation-iteration-count: infinite;
+}
+.landing-showcase-marquee-right {
+  animation-name: landing-showcase-scroll-right;
+  animation-duration: 80s;
+  animation-iteration-count: infinite;
+}
+
+.landing-showcase-row {
+  contain: layout paint;
+}
+
+/* Smooth edge fade: gradient only (no backdrop-blur) to avoid stutter when content scrolls behind */
+.landing-showcase-fade-left {
+  background: linear-gradient(
+    to right,
+    #08090a 0%,
+    rgba(8, 9, 10, 0.98) 12%,
+    rgba(8, 9, 10, 0.92) 24%,
+    rgba(8, 9, 10, 0.82) 36%,
+    rgba(8, 9, 10, 0.65) 48%,
+    rgba(8, 9, 10, 0.42) 60%,
+    rgba(8, 9, 10, 0.2) 72%,
+    rgba(8, 9, 10, 0.06) 84%,
+    transparent 92%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to right, black 0%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 0%, black 88%, transparent 100%);
+  width: min(22vw, 280px);
+  min-width: 120px;
+  contain: strict;
+}
+.landing-showcase-fade-right {
+  background: linear-gradient(
+    to left,
+    #08090a 0%,
+    rgba(8, 9, 10, 0.98) 12%,
+    rgba(8, 9, 10, 0.92) 24%,
+    rgba(8, 9, 10, 0.82) 36%,
+    rgba(8, 9, 10, 0.65) 48%,
+    rgba(8, 9, 10, 0.42) 60%,
+    rgba(8, 9, 10, 0.2) 72%,
+    rgba(8, 9, 10, 0.06) 84%,
+    transparent 92%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to left, black 0%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, black 0%, black 88%, transparent 100%);
+  width: min(22vw, 280px);
+  min-width: 120px;
+  contain: strict;
 }

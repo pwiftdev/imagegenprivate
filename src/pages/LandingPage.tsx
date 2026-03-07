@@ -1,13 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
+import { fetchShowcaseThumbnails } from '../services/imageStorage';
+import LandingCursorLogo from '../components/LandingCursorLogo';
 
-const SHOWCASE_COUNT = 6;
-const BASE = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
-/** For each slot we try .jpg first, then .png on error */
-const SHOWCASE_SLOTS = Array.from({ length: SHOWCASE_COUNT }, (_, i) => [
-  `${BASE}/showcase/${i + 1}.jpg`,
-  `${BASE}/showcase/${i + 1}.png`,
-]);
+const HERO_ROTATING_WORDS = ['hassle', 'waste', 'noise', 'clutter', 'bloat'];
+const HERO_WORD_INTERVAL_MS = 1500;
 
 /** Returns current scroll Y for parallax and nav; updates every frame while scrolling */
 function useParallaxScroll() {
@@ -50,9 +47,20 @@ function useScrollReveal(opts?: { threshold?: number; rootMargin?: string }) {
 }
 
 export default function LandingPage() {
-  /** For each slot: which URL index we're on (0 = first, 1 = second, etc.). If all fail, we show gradient. */
-  const [showcaseUrlIndex, setShowcaseUrlIndex] = useState<Record<number, number>>({});
+  const [showcaseThumbnails, setShowcaseThumbnails] = useState<string[]>([]);
+  const [heroWordIndex, setHeroWordIndex] = useState(0);
   const scrollY = useParallaxScroll();
+
+  useEffect(() => {
+    fetchShowcaseThumbnails().then(setShowcaseThumbnails);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setHeroWordIndex((i) => (i + 1) % HERO_ROTATING_WORDS.length);
+    }, HERO_WORD_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
   const [showcaseRef, showcaseInView] = useScrollReveal({ threshold: 0.08 });
   const [problemRef, problemInView] = useScrollReveal({ threshold: 0.15 });
   const [solutionRef, solutionInView] = useScrollReveal({ threshold: 0.08 });
@@ -61,6 +69,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#08090a] text-white overflow-x-hidden landing-font-body">
+      <LandingCursorLogo />
       {/* Animated background orbs - blue palette + strong parallax on scroll */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute will-change-transform" style={{ top: '-35%', left: '-25%', transform: `translate3d(0, ${scrollY * 0.28}px, 0)` }}>
@@ -128,13 +137,13 @@ export default function LandingPage() {
           >
             <span className="text-white">AI image generation</span>
             <br />
-            <span className="landing-gradient-text">without the waste</span>
+            <span className="landing-gradient-text">without the <span key={heroWordIndex} className="inline-block landing-hero-word-swap landing-gradient-text">{HERO_ROTATING_WORDS[heroWordIndex]}</span></span>
           </h1>
           <p
             className="mt-8 text-lg md:text-xl text-white/55 max-w-2xl mx-auto leading-relaxed landing-animate-fade-up opacity-0"
             style={{ animationDelay: '0.35s', animationFillMode: 'forwards' }}
           >
-            Pay only for what you use. No subscriptions, no credit traps, no overpaying the big players.
+            Pay only for what you <span className="landing-font-display font-semibold text-blue-400">Kreate</span>. No subscriptions, no credit traps, no overpaying the big players.
           </p>
           <div
             className="mt-14 flex flex-wrap items-center justify-center gap-4 landing-animate-fade-up opacity-0"
@@ -163,10 +172,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* What's Kreating? - Showcase */}
-      <section id="whats-kreating" className="relative py-28 px-6">
-        <div ref={showcaseRef} className={`max-w-6xl mx-auto relative z-10 landing-scroll-reveal ${showcaseInView ? 'landing-in-view' : ''}`}>
-          <div className="text-center mb-16 landing-reveal-item">
+      {/* What's Kreating? - Showcase: 3 rows of Supabase thumbnails, marquee full viewport width */}
+      <section id="whats-kreating" className="relative py-28 overflow-hidden">
+        <div ref={showcaseRef} className={`relative z-10 landing-scroll-reveal ${showcaseInView ? 'landing-in-view' : ''}`}>
+          <div className="max-w-6xl mx-auto px-6 text-center mb-16 landing-reveal-item">
             <h2 className="landing-font-display text-3xl md:text-5xl font-bold text-white">
               What’s <span className="landing-gradient-text">Kreating</span>?
             </h2>
@@ -174,33 +183,55 @@ export default function LandingPage() {
               Real images from the community. One prompt, one credit, no lock-in.
             </p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-            {SHOWCASE_SLOTS.map((urls, i) => {
-              const urlIndex = showcaseUrlIndex[i] ?? 0;
-              const src = urlIndex < urls.length ? urls[urlIndex] : null;
-              const showGradient = src == null;
-              return (
-                <div
-                  key={`${i}-${urlIndex}`}
-                  className="relative min-h-[200px] sm:min-h-[240px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/10 bg-white/5 landing-showcase-cell hover:border-blue-400/30 transition-all duration-500 hover:shadow-[0_0_40px_-8px_rgba(59,130,246,0.35)]"
-                  style={{ transitionDelay: showcaseInView ? `${i * 0.08}s` : '0s' }}
-                >
-                  {showGradient ? (
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-900/50 via-indigo-900/40 to-blue-800/50" aria-hidden />
-                  ) : (
-                    <img
-                      src={src}
-                      alt="Showcase"
-                      className="absolute inset-0 w-full h-full object-cover object-center"
-                      loading="eager"
-                      onError={() => setShowcaseUrlIndex((prev) => ({ ...prev, [i]: (prev[i] ?? 0) + 1 }))}
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/60 pointer-events-none" />
+          {showcaseThumbnails.length > 0 ? (
+            <div className="flex flex-col gap-4 landing-reveal-item w-full">
+              {/* Row 1: scroll left */}
+              <div className="landing-showcase-row relative w-full overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-left" aria-hidden />
+                <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-right" aria-hidden />
+                <div className="flex w-max landing-showcase-marquee-left" style={{ width: 'max-content', animationDuration: '72s' }}>
+                  {[...showcaseThumbnails, ...showcaseThumbnails].map((src, i) => (
+                    <div key={`row1-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 mr-3">
+                      <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+              {/* Row 2: scroll right */}
+              <div className="landing-showcase-row relative w-full overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-left" aria-hidden />
+                <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-right" aria-hidden />
+                <div className="flex w-max landing-showcase-marquee-right" style={{ width: 'max-content', animationDuration: '80s' }}>
+                  {[...showcaseThumbnails, ...showcaseThumbnails].map((src, i) => (
+                    <div key={`row2-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 mr-3">
+                      <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Row 3: scroll left */}
+              <div className="landing-showcase-row relative w-full overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-left" aria-hidden />
+                <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-right" aria-hidden />
+                <div className="flex w-max landing-showcase-marquee-left" style={{ width: 'max-content', animationDuration: '68s' }}>
+                  {[...showcaseThumbnails, ...showcaseThumbnails].map((src, i) => (
+                    <div key={`row3-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 mr-3">
+                      <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 landing-reveal-item min-h-[280px] items-center justify-center text-white/40">
+              <div className="flex gap-3 flex-wrap justify-center max-w-2xl">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="w-20 h-20 rounded-xl bg-white/5 border border-white/10 animate-pulse" />
+                ))}
+              </div>
+              <p className="text-sm mt-4">Community images will appear here</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -225,7 +256,7 @@ export default function LandingPage() {
               <div className="text-center">
                 <h3 className="landing-font-display font-bold text-white text-lg">Starter</h3>
                 <p className="mt-4 text-3xl font-bold text-white">$19</p>
-                <p className="mt-1 text-white/60 text-sm">200 credits</p>
+                <p className="mt-1 text-white/60 text-sm">200 credits · 200 image generations</p>
                 <p className="mt-2 text-blue-400/90 text-sm font-medium">$0.095 per credit</p>
                 <Link to="/app" className="mt-6 block w-full py-3 rounded-xl border border-white/20 text-white text-sm font-medium hover:bg-white/10 transition-colors">Get started</Link>
               </div>
@@ -236,7 +267,7 @@ export default function LandingPage() {
               <div className="text-center">
                 <h3 className="landing-font-display font-bold text-white text-lg">Kreator ⭐</h3>
                 <p className="mt-4 text-3xl font-bold text-white">$35</p>
-                <p className="mt-1 text-white/60 text-sm">400 credits</p>
+                <p className="mt-1 text-white/60 text-sm">400 credits · 400 image generations</p>
                 <p className="mt-2 text-blue-400/90 text-sm font-medium">$0.0875 per credit</p>
                 <Link to="/app" className="mt-6 block w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold hover:opacity-95 transition-opacity">Get started</Link>
               </div>
@@ -246,7 +277,7 @@ export default function LandingPage() {
               <div className="text-center">
                 <h3 className="landing-font-display font-bold text-white text-lg">Agency</h3>
                 <p className="mt-4 text-3xl font-bold text-white">$85</p>
-                <p className="mt-1 text-white/60 text-sm">1,000 credits</p>
+                <p className="mt-1 text-white/60 text-sm">1,000 credits · 1,000 image generations</p>
                 <p className="mt-2 text-blue-400/90 text-sm font-medium">$0.085 per credit</p>
                 <Link to="/app" className="mt-6 block w-full py-3 rounded-xl border border-white/20 text-white text-sm font-medium hover:bg-white/10 transition-colors">Get started</Link>
               </div>

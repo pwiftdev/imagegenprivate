@@ -294,6 +294,38 @@ export async function fetchImagesFromSupabase(
   return { images, hasMore };
 }
 
+const SHOWCASE_THUMB_LIMIT = 36;
+
+/**
+ * Fetch recent image thumbnails for the landing page showcase (no auth required if RLS allows public read).
+ * Returns thumb URLs only, newest first.
+ */
+export async function fetchShowcaseThumbnails(): Promise<string[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  const baseSelect = 'storage_path, thumb_storage_path';
+  const { data: rows, error } = await supabase
+    .from('images')
+    .select(baseSelect)
+    .order('created_at', { ascending: false })
+    .limit(SHOWCASE_THUMB_LIMIT);
+
+  if (error || !rows?.length) {
+    if (error) console.warn('Showcase thumbnails fetch failed:', error.message);
+    return [];
+  }
+
+  return (rows as { storage_path: string; thumb_storage_path?: string | null }[]).map((r) => {
+    const path = r.thumb_storage_path && typeof r.thumb_storage_path === 'string'
+      ? r.thumb_storage_path
+      : r.storage_path;
+    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(path);
+    return data.publicUrl;
+  });
+}
+
 const COST_PER_IMAGE = 0.05;
 
 export interface ImageStats {
