@@ -67,6 +67,12 @@ export default function LandingPage() {
   const [pricingRef, pricingInView] = useScrollReveal({ threshold: 0.15 });
   const [ctaRef, ctaInView] = useScrollReveal({ threshold: 0.1 });
 
+  const showcasePerRow = showcaseThumbnails.length > 0 ? Math.ceil(showcaseThumbnails.length / 3) : 0;
+  const showcaseRow1 = showcaseThumbnails.slice(0, showcasePerRow);
+  const showcaseRow2 = showcaseThumbnails.slice(showcasePerRow, showcasePerRow * 2);
+  const showcaseRow3 = showcaseThumbnails.slice(showcasePerRow * 2);
+  const showcaseShift = (dir: number) => scrollY * dir * 0.12;
+
   return (
     <div className="min-h-screen bg-[#08090a] text-white overflow-x-hidden landing-font-body">
       <LandingCursorLogo />
@@ -184,42 +190,27 @@ export default function LandingPage() {
             </p>
           </div>
           {showcaseThumbnails.length > 0 ? (
-            <div className="flex flex-col gap-4 landing-reveal-item w-full">
-              {/* Row 1: scroll left */}
-              <div className="landing-showcase-row relative w-full overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-left" aria-hidden />
-                <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-right" aria-hidden />
-                <div className="flex w-max landing-showcase-marquee-left" style={{ width: 'max-content', animationDuration: '72s' }}>
-                  {[...showcaseThumbnails, ...showcaseThumbnails].map((src, i) => (
-                    <div key={`row1-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 mr-3">
-                      <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    </div>
-                  ))}
-                </div>
+            <div className="flex flex-col gap-4 landing-reveal-item w-full overflow-hidden">
+              <div className="landing-showcase-row flex justify-center gap-3 flex-wrap" style={{ transform: `translate3d(${showcaseShift(-1)}px, 0, 0)` }}>
+                {showcaseRow1.map((src, i) => (
+                  <div key={`r1-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                    <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                ))}
               </div>
-              {/* Row 2: scroll right */}
-              <div className="landing-showcase-row relative w-full overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-left" aria-hidden />
-                <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-right" aria-hidden />
-                <div className="flex w-max landing-showcase-marquee-right" style={{ width: 'max-content', animationDuration: '80s' }}>
-                  {[...showcaseThumbnails, ...showcaseThumbnails].map((src, i) => (
-                    <div key={`row2-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 mr-3">
-                      <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    </div>
-                  ))}
-                </div>
+              <div className="landing-showcase-row flex justify-center gap-3 flex-wrap" style={{ transform: `translate3d(${showcaseShift(1)}px, 0, 0)` }}>
+                {showcaseRow2.map((src, i) => (
+                  <div key={`r2-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                    <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                ))}
               </div>
-              {/* Row 3: scroll left */}
-              <div className="landing-showcase-row relative w-full overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-left" aria-hidden />
-                <div className="absolute right-0 top-0 bottom-0 z-10 pointer-events-none landing-showcase-fade-right" aria-hidden />
-                <div className="flex w-max landing-showcase-marquee-left" style={{ width: 'max-content', animationDuration: '68s' }}>
-                  {[...showcaseThumbnails, ...showcaseThumbnails].map((src, i) => (
-                    <div key={`row3-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 mr-3">
-                      <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    </div>
-                  ))}
-                </div>
+              <div className="landing-showcase-row flex justify-center gap-3 flex-wrap" style={{ transform: `translate3d(${showcaseShift(-1)}px, 0, 0)` }}>
+                {showcaseRow3.map((src, i) => (
+                  <div key={`r3-${i}`} className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                    <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
