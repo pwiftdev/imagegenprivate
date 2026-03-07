@@ -10,7 +10,7 @@ const BANNER_HEIGHT = 40;
 
 const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
   const location = useLocation();
-  const isProfile = location.pathname === '/profile';
+  const isProfile = location.pathname === '/app/profile';
 
   return (
     <>
@@ -27,7 +27,7 @@ const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
       >
       {/* Logo / Brand */}
       <div className="flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-3">
+        <Link to="/app" className="flex items-center gap-3">
           <img src="/kreatorlogo.png" alt="Kreator" className="h-8 w-auto rounded-xl" />
           <span className="text-xl font-bold text-white tracking-tight">
             Kreator
@@ -44,7 +44,7 @@ const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
           </span>
         )}
         <Link
-          to="/profile"
+          to="/app/profile"
           className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium tracking-wide transition-all ${
             isProfile
               ? 'bg-blue-500/20 text-white border-blue-400/60 shadow-[0_0_12px_rgba(59,130,246,0.3)]'

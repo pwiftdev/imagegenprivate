@@ -344,6 +344,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   value={prompt}
                   onChange={(e) => { setPrompt(e.target.value); setEnhanceError(null); }}
                   placeholder="Enter your prompt here..."
+                  spellCheck
+                  lang="en"
                   className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4 pr-28 text-white placeholder-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 min-h-[100px] text-sm transition-all"
                 />
                 <button

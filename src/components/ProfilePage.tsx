@@ -127,7 +127,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
       <div className="w-full max-w-7xl mx-auto px-6 py-6">
         {/* Breadcrumb */}
         <Link
-          to="/"
+          to="/app"
           className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium transition-colors mb-8"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +164,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
             </div>
           </div>
           <Link
-            to="/"
+            to="/app"
             className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm transition-all flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

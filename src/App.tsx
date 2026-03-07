@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import ImageGrid, { type CreatorInfo } from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
@@ -14,6 +14,7 @@ import { fetchProfilesByIds, fetchProfile, updateProfile } from './services/prof
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import { IMAGE_MODELS } from './services/imageGeneration';
+import LandingPage from './pages/LandingPage';
 import './App.css';
 
 type GridItem =
@@ -126,7 +127,9 @@ function ResetPasswordScreen({ onSubmit }: ResetPasswordScreenProps) {
   );
 }
 
-function App() {
+function AppShell() {
+  const location = useLocation();
+  const pathname = location.pathname;
   const { user, loading: authLoading, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
   const [gridItems, setGridItems] = useState<GridItem[]>([]);
   const [queue, setQueue] = useState<QueuedJob[]>([]);
@@ -487,9 +490,9 @@ function App() {
   return (
     <>
       <Header onSignOut={signOut} credits={credits} />
-      <Routes>
-        <Route path="/profile" element={<ProfilePage user={user} />} />
-        <Route path="/" element={
+      {pathname === '/app/profile' ? (
+        <ProfilePage user={user} />
+      ) : (
     <div className="min-h-screen bg-black pb-32 pt-24">
       {/* Left pill tool panel - popup with placeholder feature buttons */}
       <LeftToolPanel
@@ -685,9 +688,18 @@ function App() {
       })()}
 
     </div>
-        } />
-      </Routes>
+      )}
     </>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/app" element={<AppShell />} />
+      <Route path="/app/profile" element={<AppShell />} />
+    </Routes>
   );
 }
 
