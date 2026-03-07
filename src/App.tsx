@@ -493,7 +493,7 @@ function AppShell() {
       {pathname === '/app/profile' ? (
         <ProfilePage user={user} />
       ) : (
-    <div className="min-h-screen bg-black pb-32 pt-24">
+    <div className="min-h-screen bg-black pb-32 pt-14">
       {/* Left pill tool panel - popup with placeholder feature buttons */}
       <LeftToolPanel
         onOpenCreate={() => setControlPanelOpen(true)}
@@ -505,7 +505,7 @@ function AppShell() {
 
       {/* Error notification */}
       {error && (
-        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
+        <div className="fixed top-14 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
           <div className="bg-red-500/90 backdrop-blur-sm text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -523,7 +523,7 @@ function AppShell() {
 
       {/* Loading indicator */}
       {runningCount > 0 && (
-        <div className="fixed top-24 right-6 z-50">
+        <div className="fixed top-14 right-6 z-50">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
             <span className="text-sm">Generating images...</span>

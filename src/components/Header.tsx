@@ -6,25 +6,12 @@ interface HeaderProps {
   credits?: number | null;
 }
 
-const BANNER_HEIGHT = 40;
-
 const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
   const location = useLocation();
   const isProfile = location.pathname === '/app/profile';
 
   return (
-    <>
-      {/* Announcement banner */}
-      <div
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-medium"
-        style={{ height: BANNER_HEIGHT }}
-      >
-        <span>Up to 50 FREE <span className="font-bold tracking-tight">Kreations</span> with Nano Banana Pro now!</span>
-      </div>
-      <header
-        className="fixed left-0 right-0 z-40 h-14 flex items-center justify-between px-6 bg-black/40 backdrop-blur-xl border-b border-white/10"
-        style={{ top: BANNER_HEIGHT }}
-      >
+    <header className="fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-6 bg-black/40 backdrop-blur-xl border-b border-white/10">
       {/* Logo / Brand */}
       <div className="flex items-center gap-3">
         <Link to="/app" className="flex items-center gap-3">
@@ -67,10 +54,7 @@ const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
         </button>
       </div>
     </header>
-    </>
   );
 };
-
-export { BANNER_HEIGHT };
 
 export default Header;
