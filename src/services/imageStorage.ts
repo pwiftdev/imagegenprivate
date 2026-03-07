@@ -301,12 +301,13 @@ const SHOWCASE_THUMB_LIMIT = 36;
  * Returns thumb URLs only, newest first.
  */
 export async function fetchShowcaseThumbnails(): Promise<string[]> {
-  if (!supabase) {
+  const client = supabase;
+  if (!client) {
     return [];
   }
 
   const baseSelect = 'storage_path, thumb_storage_path';
-  const { data: rows, error } = await supabase
+  const { data: rows, error } = await client
     .from('images')
     .select(baseSelect)
     .order('created_at', { ascending: false })
@@ -321,7 +322,7 @@ export async function fetchShowcaseThumbnails(): Promise<string[]> {
     const path = r.thumb_storage_path && typeof r.thumb_storage_path === 'string'
       ? r.thumb_storage_path
       : r.storage_path;
-    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(path);
+    const { data } = client.storage.from(BUCKET_NAME).getPublicUrl(path);
     return data.publicUrl;
   });
 }
