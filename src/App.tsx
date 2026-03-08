@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Link } from 'react-router-dom';
 import ImageGrid, { type CreatorInfo } from './components/ImageGrid';
 import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
@@ -11,10 +11,12 @@ import { generateImage, getActiveJobIds, pollJobUntilComplete } from './services
 import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupabase, deleteImage } from './services/imageStorage';
 import { fetchProfilesByIds, fetchProfile, updateProfile } from './services/profileService';
 import { fetchFolders, createFolder, type Folder } from './services/folderService';
+import { fetchMoodboards, type Moodboard } from './services/moodboardService';
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import { IMAGE_MODELS } from './services/imageGeneration';
 import LandingPage from './pages/LandingPage';
+import MoodboardsPage from './pages/MoodboardsPage';
 import './App.css';
 
 type GridItem =
@@ -139,9 +141,7 @@ function AppShell() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
-  const [qualityFilter, setQualityFilter] = useState<'All' | '1K' | '2K' | '4K'>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null); // null = "My Kreations"
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
@@ -150,7 +150,9 @@ function AppShell() {
   const [promptToInject, setPromptToInject] = useState<string | null>(null);
   const [referenceImageUrlToInject, setReferenceImageUrlToInject] = useState<string | null>(null);
   const [referenceImageUrlsToInject, setReferenceImageUrlsToInject] = useState<string[] | null>(null);
+  const [moodboardUrlsToInject, setMoodboardUrlsToInject] = useState<string[] | null>(null);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
+  const [moodboards, setMoodboards] = useState<Moodboard[]>([]);
   const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
   const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
   const [hasMoreImages, setHasMoreImages] = useState(false);
@@ -199,15 +201,19 @@ function AppShell() {
       });
   }, [user?.id]);
 
+  // Load moodboards when user is set
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchMoodboards(user.id)
+      .then(setMoodboards)
+      .catch((err) => {
+        console.error('Failed to load moodboards:', err);
+        setMoodboards([]);
+      });
+  }, [user?.id]);
+
   const filteredGridItems = useMemo(() => {
     let list = gridItems;
-    if (qualityFilter !== 'All') {
-      list = list.filter((item) =>
-        item.type === 'image' ? item.imageSize === qualityFilter
-          : item.type === 'placeholder' ? item.imageSize === qualityFilter
-          : true
-      );
-    }
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       list = list.filter((item) =>
@@ -216,7 +222,7 @@ function AppShell() {
       );
     }
     return list;
-  }, [gridItems, qualityFilter, searchQuery]);
+  }, [gridItems, searchQuery]);
 
   useEffect(() => {
     imageCountRef.current = gridItems.filter((i) => i.type === 'image').length;
@@ -229,8 +235,8 @@ function AppShell() {
       setIsLoading(true);
       try {
         const opts: { limit: number; offset: number; folderId?: string | null } = { limit: 12, offset: 0 };
-        if (viewMode === 'mine') opts.folderId = activeFolderId;
-        const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, opts);
+        opts.folderId = activeFolderId;
+        const { images: stored, hasMore } = await fetchImagesFromSupabase('mine', opts);
         const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
         const creatorMap = await fetchProfilesByIds(userIds);
         const newImages: GridItem[] = stored
@@ -264,7 +270,7 @@ function AppShell() {
       }
     }
     load();
-  }, [user?.id, viewMode, imagesRefreshKey, activeFolderId]);
+  }, [user?.id, imagesRefreshKey, activeFolderId]);
 
   const loadMoreImages = useCallback(async () => {
     if (!user || isLoadingMore || !hasMoreImages) return;
@@ -272,8 +278,8 @@ function AppShell() {
     setIsLoadingMore(true);
     try {
       const opts: { limit: number; offset: number; folderId?: string | null } = { limit: 12, offset };
-      if (viewMode === 'mine') opts.folderId = activeFolderId;
-      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, opts);
+      opts.folderId = activeFolderId;
+      const { images: stored, hasMore } = await fetchImagesFromSupabase('mine', opts);
       const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
       const creatorMap = await fetchProfilesByIds(userIds);
       const moreImages: GridItem[] = stored.map((img) => ({
@@ -295,7 +301,7 @@ function AppShell() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [user?.id, viewMode, hasMoreImages, isLoadingMore, activeFolderId]);
+  }, [user?.id, hasMoreImages, isLoadingMore, activeFolderId]);
 
   // Infinite scroll: load more when sentinel enters viewport
   useEffect(() => {
@@ -512,6 +518,11 @@ function AppShell() {
     setControlPanelOpen(true);
   }, []);
 
+  const handleMoodboardInjected = useCallback(() => {
+    setMoodboardUrlsToInject(null);
+    setControlPanelOpen(true);
+  }, []);
+
   const handleReRun = useCallback((prompt: string, referenceImageUrls?: string[]) => {
     setPromptToInject(prompt);
     if (referenceImageUrls && referenceImageUrls.length > 0) {
@@ -559,9 +570,18 @@ function AppShell() {
 
   return (
     <>
-      {pathname !== '/app/profile' && <Header onSignOut={signOut} credits={credits} />}
+      {pathname !== '/app/profile' && pathname !== '/app/moodboards' && <Header onSignOut={signOut} credits={credits} />}
       {pathname === '/app/profile' ? (
         <ProfilePage user={user} credits={credits} onSignOut={signOut} onRequestPasswordReset={user?.email ? async () => { await resetPassword(user.email!); } : undefined} />
+      ) : pathname === '/app/moodboards' ? (
+        <MoodboardsPage
+          user={user}
+          onSignOut={signOut}
+          onUseMoodboard={(urls) => {
+            setMoodboardUrlsToInject(urls);
+            setControlPanelOpen(true);
+          }}
+        />
       ) : (
     <div className="min-h-screen bg-[#08090a] pb-32 pt-16 landing-font-body relative">
       {/* Background – same vibe as landing (orbs + gradient + noise) */}
@@ -634,34 +654,20 @@ function AppShell() {
       )}
 
       {/* Loading indicator */}
-      {runningCount > 0 && (
-        <div className="fixed top-16 right-6 z-50">
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
-            <span className="text-sm">Generating images...</span>
-          </div>
-        </div>
-      )}
-
       {/* Content container - full-width, above background */}
       <div className="relative z-10 w-full px-6">
         {/* Dashboard header + stats (mine view) or simple header (all view) */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-6 pt-6">
+        <div className="flex flex-col gap-6 pb-6 pt-6">
           <div>
             <h1 className="landing-font-display text-3xl md:text-4xl font-bold text-white tracking-tight">
-              {viewMode === 'mine' ? (
-                <>Your <span className="dashboard-title-gradient">Kreations</span></>
-              ) : (
-                <>What people are <span className="dashboard-title-gradient">Kreating</span></>
-              )}
+              Your <span className="dashboard-title-gradient">Kreations</span>
             </h1>
             <p className="text-white/55 text-base mt-1">
-              {viewMode === 'mine'
-                ? 'Your creative hub — track your work and explore new ideas'
-                : 'Discover what the community is creating'}
+              Your creative hub — track your work and explore new ideas
             </p>
-            {viewMode === 'mine' && (
-              <div className="flex items-center gap-2 mt-4 flex-wrap">
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setActiveFolderId(null)}
@@ -694,17 +700,8 @@ function AppShell() {
                 >
                   <span aria-hidden>+</span> New folder
                 </button>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                onClick={() => setViewMode(viewMode === 'mine' ? 'all' : 'mine')}
-                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
-              >
-                {viewMode === 'mine' ? 'Explore community' : 'Back to my Kreations'}
-              </button>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap mr-[5px]">
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -718,21 +715,15 @@ function AppShell() {
                   aria-label="Search by prompt"
                 />
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {(['All', '1K', '2K', '4K'] as const).map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setQualityFilter(q)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    qualityFilter === q
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
-                  }`}
-                >
-                  {q}
-                </button>
-              ))}
+              <Link
+                to="/app/moodboards"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white/80 hover:text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                My Moodboards
+              </Link>
             </div>
           </div>
         </div>
@@ -745,7 +736,7 @@ function AppShell() {
           </div>
         ) : (() => {
           const isEmpty = filteredGridItems.length === 0;
-          const isMineEmptyAll = viewMode === 'mine' && qualityFilter === 'All' && !searchQuery.trim();
+          const isMineEmptyAll = !searchQuery.trim();
           const noImagesYet = isMineEmptyAll && gridItems.filter((i) => i.type === 'image').length === 0;
           const noCredits = credits === 0;
           return isEmpty ? (
@@ -757,20 +748,12 @@ function AppShell() {
                   </svg>
                 </div>
                 <h2 className="landing-font-display text-xl font-bold text-white mb-2">
-                  {searchQuery.trim()
-                    ? 'No matches'
-                    : viewMode === 'mine'
-                      ? (qualityFilter === 'All' ? 'No kreations yet' : `No ${qualityFilter} images`)
-                      : (qualityFilter === 'All' ? 'No one has shared yet' : `No ${qualityFilter} images`)}
+                  {searchQuery.trim() ? 'No matches' : 'No kreations yet'}
                 </h2>
                 <p className="text-white/55 text-sm mb-5">
                   {searchQuery.trim()
                     ? 'Try a different search or clear the search box.'
-                    : viewMode === 'mine' && qualityFilter === 'All'
-                      ? 'Create your first image with a prompt — or explore the community for inspiration.'
-                      : viewMode === 'all'
-                        ? 'Be the first to share something with the community!'
-                        : `Try "All" or generate images at ${qualityFilter}.`}
+                    : 'Create your first image with a prompt — or explore new ideas.'}
                 </p>
                 {noImagesYet && noCredits && (
                   <p className="text-white/45 text-xs mb-4">You're out of credits. Get more to start creating.</p>
@@ -842,6 +825,10 @@ function AppShell() {
             onReferenceImageInjected={handleReferenceImageInjected}
             referenceImageUrlsToInject={referenceImageUrlsToInject}
             onReferenceImagesInjected={handleReferenceImagesInjected}
+            moodboards={moodboards}
+            onRequestMoodboardInjection={(urls) => setMoodboardUrlsToInject(urls)}
+            moodboardUrlsToInject={moodboardUrlsToInject}
+            onMoodboardInjected={handleMoodboardInjected}
             onCloseMobile={() => setControlPanelOpen(false)}
             className="pointer-events-auto"
           />
@@ -880,8 +867,8 @@ function AppShell() {
             onReusePrompt={(promptText, refUrls) => {
               handleReRun(promptText, refUrls);
             }}
-            imageId={viewMode === 'mine' ? item.id : undefined}
-            onDelete={viewMode === 'mine' ? handleDeleteImage : undefined}
+            imageId={item.id}
+            onDelete={handleDeleteImage}
             onPrev={onPrev}
             onNext={onNext}
             hasPrev={hasPrev}
@@ -902,6 +889,7 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/app" element={<AppShell />} />
       <Route path="/app/profile" element={<AppShell />} />
+      <Route path="/app/moodboards" element={<AppShell />} />
     </Routes>
   );
 }
