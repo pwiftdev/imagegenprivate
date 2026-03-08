@@ -15,11 +15,13 @@ import { fetchFolders, createFolder, type Folder } from './services/folderServic
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import { IMAGE_MODELS } from './services/imageGeneration';
+import { createVideoTask, getVideoStatus, getVideoContent, type VideoModelId } from './services/videoGeneration';
 import LandingPage from './pages/LandingPage';
 import './App.css';
 
 type GridItem =
   | { type: 'image'; id: string; url: string; thumbUrl?: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
+  | { type: 'video'; id: string; url: string; prompt: string; model?: string }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface QueuedJob {
@@ -201,11 +203,19 @@ function AppShell() {
   const filteredGridItems = useMemo(() => {
     let list = gridItems;
     if (qualityFilter !== 'All') {
-      list = list.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
+      list = list.filter((item) =>
+        item.type === 'image' ? item.imageSize === qualityFilter
+          : item.type === 'video' ? false
+          : item.imageSize === qualityFilter
+      );
     }
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      list = list.filter((item) => item.type === 'placeholder' || (item.type === 'image' && item.prompt?.toLowerCase().includes(q)));
+      list = list.filter((item) =>
+        item.type === 'placeholder' ||
+        (item.type === 'image' && item.prompt?.toLowerCase().includes(q)) ||
+        (item.type === 'video' && item.prompt?.toLowerCase().includes(q))
+      );
     }
     return list;
   }, [gridItems, qualityFilter, searchQuery]);
@@ -512,6 +522,59 @@ function AppShell() {
     }
     setControlPanelOpen(true);
   }, []);
+
+  const handleGenerateVideo = useCallback(
+    async (params: { prompt: string; model: VideoModelId; referenceImageUrl?: string | null }) => {
+      if (!params.prompt.trim()) {
+        setError('Please enter a prompt');
+        return;
+      }
+      setError(null);
+      const placeholderId = `video-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const placeholders: GridItem[] = [
+        { type: 'placeholder', id: placeholderId, status: 'generating', aspectRatio: '16:9', imageSize: '1K' },
+      ];
+      setGridItems((prev) => [...placeholders, ...prev]);
+
+      try {
+        const { videoId } = await createVideoTask({
+          prompt: params.prompt.trim(),
+          model: params.model,
+          referenceImageUrl: params.referenceImageUrl || undefined,
+        });
+
+        const POLL_INTERVAL = 5000;
+        const POLL_TIMEOUT = 600_000;
+        const start = Date.now();
+        while (Date.now() - start < POLL_TIMEOUT) {
+          const { status } = await getVideoStatus(videoId);
+          if (status === 'completed') {
+            const content = await getVideoContent(videoId);
+            const videoItem: GridItem = {
+              type: 'video',
+              id: content.videoId,
+              url: content.url,
+              prompt: content.prompt,
+              model: content.model,
+            };
+            setGridItems((prev) =>
+              prev.map((p) => (p.type === 'placeholder' && p.id === placeholderId ? videoItem : p))
+            );
+            return;
+          }
+          if (status === 'failed') {
+            throw new Error('Video generation failed');
+          }
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+        }
+        throw new Error('Video generation timed out');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Video generation failed');
+        setGridItems((prev) => prev.filter((p) => !(p.type === 'placeholder' && p.id === placeholderId)));
+      }
+    },
+    []
+  );
 
   if (authLoading) {
     return (
@@ -833,6 +896,7 @@ function AppShell() {
         <div className="flex justify-center">
           <ControlPanel
             onGenerate={handleGenerate}
+            onGenerateVideo={handleGenerateVideo}
             credits={credits}
             promptToInject={promptToInject}
             onPromptInjected={handlePromptInjected}

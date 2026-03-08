@@ -5,6 +5,7 @@ export type CreatorInfo = { username: string; avatar_url: string | null };
 
 export type ImageGridItem =
   | { type: 'image'; id: string; url: string; thumbUrl?: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
+  | { type: 'video'; id: string; url: string; prompt: string; model?: string }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
 
 interface ImageGridProps {
@@ -145,6 +146,36 @@ const ImageCard = memo(function ImageCard({ item, index, onImageClick, onReRun, 
   );
 });
 
+const VideoCard = memo(function VideoCard({
+  item,
+  index,
+  onImageClick,
+}: {
+  item: Extract<ImageGridItem, { type: 'video' }>;
+  index: number;
+  onImageClick?: (index: number) => void;
+}) {
+  const handleClick = useCallback(() => onImageClick?.(index), [index, onImageClick]);
+  return (
+    <div
+      className="animate-pop-in relative bg-gray-800 overflow-hidden group cursor-pointer transition-transform hover:scale-[1.08]"
+      style={{ aspectRatio: '16/9', animationDelay: `${hashToDelay(item.id, 400)}ms` }}
+      onClick={handleClick}
+    >
+      <video
+        src={item.url}
+        className="absolute inset-0 w-full h-full object-cover"
+        controls
+        playsInline
+        preload="metadata"
+      />
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <p className="text-white/90 text-xs line-clamp-2">{item.prompt}</p>
+      </div>
+    </div>
+  );
+});
+
 const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onReRun, onAddToReference }) => {
   return (
     <div className="w-full">
@@ -152,6 +183,8 @@ const ImageGrid: React.FC<ImageGridProps> = memo(({ items, onImageClick, onReRun
         {items.map((item, index) =>
           item.type === 'placeholder' ? (
             <PlaceholderCard key={item.id} item={item} />
+          ) : item.type === 'video' ? (
+            <VideoCard key={item.id} item={item} index={index} onImageClick={onImageClick} />
           ) : (
             <ImageCard
               key={item.id}
