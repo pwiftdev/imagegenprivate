@@ -131,7 +131,7 @@ function ResetPasswordScreen({ onSubmit }: ResetPasswordScreenProps) {
 function AppShell() {
   const location = useLocation();
   const pathname = location.pathname;
-  const { user, loading: authLoading, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signInWithGoogle, signOut, resetPassword, updatePassword } = useAuth();
   const [gridItems, setGridItems] = useState<GridItem[]>([]);
   const [queue, setQueue] = useState<QueuedJob[]>([]);
   const [runningCount, setRunningCount] = useState(0);
@@ -540,6 +540,7 @@ function AppShell() {
       <AuthScreen
         onSignIn={async (email, password) => { await signIn(email, password); }}
         onSignUp={async (email, password, username) => { await signUp(email, password, username); }}
+        onSignInWithGoogle={async () => { await signInWithGoogle(); }}
         onResetPassword={async (email) => { await resetPassword(email); }}
       />
     );

@@ -43,6 +43,18 @@ export function useAuth() {
     return data;
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error('Supabase not configured');
+    const redirectTo =
+      typeof window !== 'undefined' ? `${window.location.origin}/app` : undefined;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    });
+    if (error) throw error;
+    return data;
+  }, []);
+
   const resetPassword = useCallback(async (email: string) => {
     if (!supabase) throw new Error('Supabase not configured');
     const redirectTo =
@@ -66,5 +78,5 @@ export function useAuth() {
     await supabase.auth.signOut();
   }, []);
 
-  return { user, loading, signUp, signIn, signOut, resetPassword, updatePassword };
+  return { user, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword, updatePassword };
 }
