@@ -157,6 +157,16 @@
   color: transparent;
 }
 
+/* Dashboard title word: pink → purple → blue, subtle shift */
+.dashboard-title-gradient {
+  background: linear-gradient(135deg, #f472b6 0%, #ec4899 25%, #a855f7 50%, #6366f1 75%, #60a5fa 100%);
+  background-size: 200% 200%;
+  animation: landing-gradient-shift 5s ease-in-out infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 /* Hero rotating word: run swap animation + keep gradient (gradient-text’s animation would override otherwise) */
 .landing-hero-word-swap.landing-gradient-text {
   animation: landing-hero-word-swap 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards, landing-gradient-shift 6s ease infinite;

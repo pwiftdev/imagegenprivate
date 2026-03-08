@@ -342,7 +342,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 alt="Kreator"
                 className="h-8 w-auto rounded-lg mb-2"
               />
-              <p className="text-white/50 text-xs italic">By Kreator, for creators.</p>
+              <p className="text-white/50 text-xs">By Kreator, for creators.</p>
             </div>
 
             {prompt && (

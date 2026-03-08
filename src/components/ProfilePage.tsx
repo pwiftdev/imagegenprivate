@@ -19,11 +19,16 @@ import type { ImageStats } from '../services/imageStorage';
 
 interface ProfilePageProps {
   user: User;
+  credits?: number | null;
+  onSignOut: () => void;
+  onRequestPasswordReset?: () => Promise<void>;
 }
 
-const QUALITY_COLORS = { '1K': '#3b82f6', '2K': '#8b5cf6', '4K': '#ec4899' };
+type Section = 'overview' | 'account';
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
+const QUALITY_COLORS = { '1K': '#3b82f6', '2K': '#6366f1', '4K': '#8b5cf6' };
+
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onRequestPasswordReset }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +36,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
   const [username, setUsername] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [stats, setStats] = useState<ImageStats | null>(null);
+  const [section, setSection] = useState<Section>('overview');
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadProfile = useCallback(async () => {
@@ -116,241 +124,396 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center pt-24">
+      <div className="min-h-screen bg-[#08090a] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-2 border-white/20 border-t-blue-500" />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-black pb-16 pt-24">
-      <div className="w-full max-w-7xl mx-auto px-6 py-6">
-        {/* Breadcrumb */}
-        <Link
-          to="/app"
-          className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium transition-colors mb-8"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Kreations
-        </Link>
+  const navItems: { id: Section; label: string; icon: React.ReactNode }[] = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2a2 2 0 012 2zm0 12v-2a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'account',
+      label: 'Account',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+    },
+  ];
 
-        {/* Dashboard header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
-          <div className="flex items-center gap-4 flex-1">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="relative group flex-shrink-0"
-            >
-              <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/20 flex items-center justify-center ring-2 ring-transparent group-hover:ring-blue-500/50 transition-all">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <svg className="w-8 h-8 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                )}
-              </div>
-              <div className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="text-white text-xs font-medium">Edit</span>
-              </div>
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-            <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">{username || 'Creator'}</h1>
-              <p className="text-white/50 text-sm">{user.email}</p>
+  return (
+    <div className="h-screen bg-[#08090a] text-white flex landing-font-body overflow-hidden">
+      {/* Left sidebar – viewport height, not scrollable */}
+      <aside className="hidden md:flex w-56 h-full flex-shrink-0 flex-col border-r border-white/10 bg-[#08090a]/95 backdrop-blur-xl overflow-hidden">
+        <div className="p-4 border-b border-white/10 flex-shrink-0">
+          <Link to="/app" className="flex items-center gap-2.5 group">
+            <img src="/kreatorlogo.png" alt="Kreator" className="h-8 w-auto rounded-lg" />
+            <span className="landing-font-display font-bold text-white tracking-tight group-hover:text-blue-200 transition-colors">Kreator</span>
+          </Link>
+        </div>
+        <nav className="flex-1 p-3 space-y-0.5 overflow-hidden">
+          {navItems.map((item) => {
+            const isActive = section === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSection(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
+                    : 'text-white/70 hover:text-white hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="p-3 border-t border-white/10 flex-shrink-0 space-y-2">
+          {typeof credits === 'number' && (
+            <div className="px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-white/50 text-xs font-medium uppercase tracking-wider">Credits</p>
+              <p className="text-white font-semibold text-lg">{credits}</p>
             </div>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-white/80 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Sign out
+          </button>
           <Link
             to="/app"
-            className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm transition-all flex items-center gap-2"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors w-full"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
             </svg>
-            View my Kreations
+            Back to Kreations
           </Link>
         </div>
+      </aside>
 
-        {/* Alerts */}
-        {error && (
-          <div className="mb-6 rounded-xl bg-red-500/15 border border-red-500/30 px-4 py-3 text-red-300 text-sm">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-6 rounded-xl bg-blue-500/15 border border-blue-500/30 px-4 py-3 text-blue-300 text-sm">
-            {success}
-          </div>
-        )}
-
-        {/* Stats overview cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Total Kreations</p>
-            <p className="text-3xl font-bold text-white">{(stats?.totalImages ?? 0).toLocaleString()}</p>
-          </div>
-          <div className="rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">This Month</p>
-            <p className="text-3xl font-bold text-white">{thisMonth}</p>
-            <p className="text-white/40 text-xs mt-0.5">{currentMonthStr}</p>
-          </div>
-          <div className="rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Last Active</p>
-            <p className="text-lg font-bold text-white">{stats?.recentActivity?.[0]?.date ?? '—'}</p>
-            {stats?.recentActivity?.[0] && (
-              <p className="text-white/40 text-xs mt-0.5">{stats.recentActivity[0].count} images</p>
-            )}
-          </div>
-          <div className="rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Recent Days</p>
-            <p className="text-3xl font-bold text-white">{stats?.recentActivity?.length ?? 0}</p>
-            <p className="text-white/40 text-xs mt-0.5">days with activity</p>
-          </div>
-        </div>
-
-        {/* Charts + Settings grid */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          {/* Monthly activity chart */}
-          <div className="lg:col-span-2 rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Monthly Activity</h2>
-            {stats?.monthlyOverview && stats.monthlyOverview.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={[...stats.monthlyOverview].reverse().slice(-6)}
-                    margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                  >
-                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} allowDecimals={false} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '12px',
-                        color: '#e2e8f0',
-                      }}
-                      labelStyle={{ color: '#94a3b8' }}
-                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    />
-                    <Bar dataKey="images" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-white/40 text-sm">
-                No activity yet — start creating to see your chart
-              </div>
-            )}
+      {/* Main content – only this area scrolls */}
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="p-6 md:p-8 w-full">
+          {/* Mobile: back + section switcher */}
+          <div className="flex md:hidden items-center justify-between gap-4 mb-6">
+            <Link to="/app" className="flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              Back
+            </Link>
+            <div className="flex rounded-xl bg-white/5 border border-white/10 p-1">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSection(item.id)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${section === item.id ? 'bg-blue-500/20 text-blue-300' : 'text-white/60'}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Quality breakdown */}
-          <div className="rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Quality Breakdown</h2>
-            {qualityChartData.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={qualityChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {qualityChartData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '12px',
-                        color: '#e2e8f0',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-white/40 text-sm text-center px-4">
-                Generate images to see quality distribution
-              </div>
-            )}
-          </div>
-        </div>
+          {/* Alerts */}
+          {error && (
+            <div className="mb-6 rounded-xl bg-red-500/15 border border-red-500/30 px-4 py-3 text-red-300 text-sm">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-6 rounded-xl bg-blue-500/15 border border-blue-500/30 px-4 py-3 text-blue-300 text-sm">
+              {success}
+            </div>
+          )}
 
-        {/* Recent activity table + Profile settings */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Recent activity */}
-          <div className="lg:col-span-2 rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Recent Activity</h2>
-            {stats?.recentActivity && stats.recentActivity.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-white/50 border-b border-white/10">
-                      <th className="text-left py-3 font-medium">Date</th>
-                      <th className="text-right py-3 font-medium">Images</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.recentActivity.map((row, i) => (
-                      <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="py-3 text-white">{row.date}</td>
-                        <td className="py-3 text-right text-white/80">{row.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {section === 'overview' && (
+            <>
+              {/* Page title */}
+              <div className="mb-8">
+                <h1 className="landing-font-display text-2xl md:text-3xl font-bold text-white">Overview</h1>
+                <p className="text-white/55 text-sm mt-1">Your Kreator stats and activity</p>
               </div>
-            ) : (
-              <p className="text-white/40 text-sm">No recent activity</p>
-            )}
-          </div>
 
-          {/* Profile settings card */}
-          <div className="rounded-2xl backdrop-blur-xl bg-gradient-to-br from-white/10 via-white/5 to-white/5 border border-white/20 p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Profile Settings</h2>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label htmlFor="username" className="block text-white/70 text-sm mb-1.5">
-                  Display name
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Your display name"
-                  className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-white/70 text-sm mb-1.5">Email</label>
-                <div className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white/70 text-sm">
-                  {user.email}
+              {/* Stats cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                  <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Total Kreations</p>
+                  <p className="text-2xl font-bold text-white">{(stats?.totalImages ?? 0).toLocaleString()}</p>
                 </div>
-                <p className="text-white/40 text-xs mt-1">Email cannot be changed</p>
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                  <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">This Month</p>
+                  <p className="text-2xl font-bold text-white">{thisMonth}</p>
+                  <p className="text-white/40 text-xs mt-0.5">{currentMonthStr}</p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                  <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Last Active</p>
+                  <p className="text-lg font-bold text-white">{stats?.recentActivity?.[0]?.date ?? '—'}</p>
+                  {stats?.recentActivity?.[0] && (
+                    <p className="text-white/40 text-xs mt-0.5">{stats.recentActivity[0].count} images</p>
+                  )}
+                </div>
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                  <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Active Days</p>
+                  <p className="text-2xl font-bold text-white">{stats?.recentActivity?.length ?? 0}</p>
+                  <p className="text-white/40 text-xs mt-0.5">days with activity</p>
+                </div>
               </div>
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-            </form>
-          </div>
+
+              {/* Charts row */}
+              <div className="grid lg:grid-cols-3 gap-6 mb-8">
+                <div className="lg:col-span-2 rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Monthly Activity</h2>
+                  {stats?.monthlyOverview && stats.monthlyOverview.length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={[...stats.monthlyOverview].reverse().slice(-6)}
+                          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                        >
+                          <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
+                          <YAxis stroke="#94a3b8" fontSize={12} allowDecimals={false} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(8, 9, 10, 0.95)',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              borderRadius: '12px',
+                              color: '#e2e8f0',
+                            }}
+                            labelStyle={{ color: '#94a3b8' }}
+                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                          />
+                          <Bar dataKey="images" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center text-white/40 text-sm">
+                      No activity yet — start creating to see your chart
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Quality Breakdown</h2>
+                  {qualityChartData.length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={qualityChartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                            label={({ name, value }) => `${name}: ${value}`}
+                          >
+                            {qualityChartData.map((entry, i) => (
+                              <Cell key={i} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(8, 9, 10, 0.95)',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              borderRadius: '12px',
+                              color: '#e2e8f0',
+                            }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 12 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center text-white/40 text-sm text-center px-4">
+                      Generate images to see quality distribution
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Recent activity */}
+              <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Recent Activity</h2>
+                {stats?.recentActivity && stats.recentActivity.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-white/50 border-b border-white/10">
+                          <th className="text-left py-3 font-medium">Date</th>
+                          <th className="text-right py-3 font-medium">Images</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.recentActivity.map((row, i) => (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td className="py-3 text-white">{row.date}</td>
+                            <td className="py-3 text-right text-white/80">{row.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-white/40 text-sm">No recent activity</p>
+                )}
+              </section>
+            </>
+          )}
+
+          {section === 'account' && (
+            <>
+              <div className="mb-8">
+                <h1 className="landing-font-display text-2xl md:text-3xl font-bold text-white">Account</h1>
+                <p className="text-white/55 text-sm mt-1">Profile, credits, and security</p>
+              </div>
+
+              <div className="w-full space-y-6">
+                {/* Profile overview card */}
+                <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Profile</h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="relative group flex-shrink-0 self-start sm:self-auto"
+                    >
+                      <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white/5 border-2 border-white/15 flex items-center justify-center ring-2 ring-transparent group-hover:ring-blue-500/50 transition-all">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <svg className="w-10 h-10 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs font-medium">Change photo</span>
+                      </div>
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                    <div className="min-w-0">
+                      <p className="landing-font-display text-xl font-bold text-white truncate">{username || 'Creator'}</p>
+                      <p className="text-white/55 text-sm mt-0.5 truncate">{user.email}</p>
+                      <Link to="/app" className="inline-flex items-center gap-2 mt-3 text-sm text-blue-400 hover:text-blue-300 font-medium">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                        </svg>
+                        View my Kreations
+                      </Link>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Credits card */}
+                <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Kreate credits</h2>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold text-white">{typeof credits === 'number' ? credits.toLocaleString() : '—'}</span>
+                    <span className="text-white/50 text-sm">credits available</span>
+                  </div>
+                  <p className="text-white/40 text-xs mt-2">One credit = one generation. Top up when you need more.</p>
+                  <Link to="/app" className="inline-flex items-center gap-2 mt-3 text-sm text-blue-400 hover:text-blue-300 font-medium">
+                    Start creating
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </Link>
+                </section>
+
+                {/* Profile & identity */}
+                <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Profile details</h2>
+                  <form onSubmit={handleSave} className="space-y-4">
+                    <div>
+                      <label htmlFor="profile-username" className="block text-white/80 text-sm font-medium mb-1.5">Display name</label>
+                      <input
+                        id="profile-username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Your display name"
+                        className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-sm"
+                      />
+                      <p className="text-white/40 text-xs mt-1">Shown on your Kreations in the community view</p>
+                    </div>
+                    <div>
+                      <label className="block text-white/80 text-sm font-medium mb-1.5">Email</label>
+                      <div className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 text-white/70 text-sm">
+                        {user.email}
+                      </div>
+                      <p className="text-white/40 text-xs mt-1">Used for sign-in. Email cannot be changed here.</p>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20"
+                    >
+                      {saving ? 'Saving...' : 'Save changes'}
+                    </button>
+                  </form>
+                </section>
+
+                {/* Security – password reset */}
+                <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Security</h2>
+                  <p className="text-white/70 text-sm mb-4">Change your password by requesting a reset link. We’ll send it to your account email.</p>
+                  {onRequestPasswordReset ? (
+                    <>
+                      {passwordResetSent ? (
+                        <p className="text-blue-300 text-sm">Check your email for a password reset link.</p>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={passwordResetLoading}
+                          onClick={async () => {
+                            setPasswordResetLoading(true);
+                            setError(null);
+                            try {
+                              await onRequestPasswordReset();
+                              setPasswordResetSent(true);
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : 'Failed to send reset link');
+                            } finally {
+                              setPasswordResetLoading(false);
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-300 text-sm font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          {passwordResetLoading ? 'Sending...' : 'Send password reset link'}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-white/40 text-sm">Password reset is not available.</p>
+                  )}
+                </section>
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 };

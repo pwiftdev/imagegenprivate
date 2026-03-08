@@ -489,11 +489,26 @@ function AppShell() {
 
   return (
     <>
-      <Header onSignOut={signOut} credits={credits} />
+      {pathname !== '/app/profile' && <Header onSignOut={signOut} credits={credits} />}
       {pathname === '/app/profile' ? (
-        <ProfilePage user={user} />
+        <ProfilePage user={user} credits={credits} onSignOut={signOut} onRequestPasswordReset={user?.email ? () => resetPassword(user.email!) : undefined} />
       ) : (
-    <div className="min-h-screen bg-black pb-32 pt-14">
+    <div className="min-h-screen bg-[#08090a] pb-32 pt-16 landing-font-body relative">
+      {/* Background – same vibe as landing (orbs + gradient + noise) */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div className="absolute" style={{ top: '-35%', left: '-25%' }}>
+          <div className="w-[90vmax] h-[90vmax] rounded-full bg-gradient-to-br from-blue-500/12 via-indigo-500/8 to-blue-600/12 landing-animate-float landing-animate-glow" />
+        </div>
+        <div className="absolute" style={{ bottom: '-25%', right: '-20%' }}>
+          <div className="w-[70vmax] h-[70vmax] rounded-full bg-gradient-to-tl from-indigo-500/10 via-blue-500/8 to-sky-500/10 landing-animate-float-slow landing-animate-glow" style={{ animationDelay: '-5s' }} />
+        </div>
+        <div className="absolute" style={{ top: '55%', left: '45%' }}>
+          <div className="w-[50vmax] h-[50vmax] rounded-full bg-gradient-to-br from-sky-500/6 to-blue-600/8 landing-animate-float" style={{ animationDelay: '-10s' }} />
+        </div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.08),transparent)]" />
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.02\'/%3E%3C/svg%3E')]" />
+      </div>
+
       {/* Left pill tool panel - popup with placeholder feature buttons */}
       <LeftToolPanel
         onOpenCreate={() => setControlPanelOpen(true)}
@@ -505,7 +520,7 @@ function AppShell() {
 
       {/* Error notification */}
       {error && (
-        <div className="fixed top-14 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
           <div className="bg-red-500/90 backdrop-blur-sm text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -523,7 +538,7 @@ function AppShell() {
 
       {/* Loading indicator */}
       {runningCount > 0 && (
-        <div className="fixed top-14 right-6 z-50">
+        <div className="fixed top-16 right-6 z-50">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
             <span className="text-sm">Generating images...</span>
@@ -531,15 +546,19 @@ function AppShell() {
         </div>
       )}
 
-      {/* Content container - full-width */}
-      <div className="w-full px-6">
+      {/* Content container - full-width, above background */}
+      <div className="relative z-10 w-full px-6">
         {/* Dashboard header + stats (mine view) or simple header (all view) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-6 pt-6">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-              {viewMode === 'mine' ? 'Your Kreations' : 'What people are Kreating'}
+            <h1 className="landing-font-display text-3xl md:text-4xl font-bold text-white tracking-tight">
+              {viewMode === 'mine' ? (
+                <>Your <span className="dashboard-title-gradient">Kreations</span></>
+              ) : (
+                <>What people are <span className="dashboard-title-gradient">Kreating</span></>
+              )}
             </h1>
-            <p className="text-white/60 text-base mt-1">
+            <p className="text-white/55 text-base mt-1">
               {viewMode === 'mine'
                 ? 'Your creative hub — track your work and explore new ideas'
                 : 'Discover what the community is creating'}
@@ -622,7 +641,7 @@ function AppShell() {
       {!controlPanelOpen && (
         <button
           onClick={() => setControlPanelOpen(true)}
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-[32%] bg-blue-500 hover:bg-blue-600 text-white py-4 rounded-t-3xl shadow-lg shadow-blue-500/30 transition-colors active:bg-blue-700"
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-[32%] landing-font-display bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-4 rounded-t-3xl shadow-lg shadow-blue-500/30 transition-colors active:from-blue-700 active:to-blue-800"
         >
           Start <span className="text-xl font-bold tracking-tight">Kreating</span>
         </button>
