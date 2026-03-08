@@ -232,28 +232,22 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className={`w-[96%] md:w-[50%] mb-8 px-1 md:px-4 ${className ?? ''}`}>
       <div className="relative">
-        {/* Liquid glass effect container with blue shine */}
-        <div className="relative rounded-3xl backdrop-blur-xl bg-gradient-to-b from-white/10 via-white/5 to-white/5 border border-white/20 shadow-2xl overflow-hidden">
-          {/* Blue subtle shine overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-blue-400/5 pointer-events-none"></div>
-          {/* Gradient overlay for liquid effect */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-50 pointer-events-none"></div>
-          {/* Top border highlight with blue tint */}
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
-          {/* Inner glow effect */}
-          <div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
+        {/* Dark panel with visible transparency */}
+        <div className="relative rounded-3xl bg-[#0c0d0f]/70 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden">
+          {/* Subtle top edge */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
 
-          {/* Info bar */}
-          <div className="relative z-10 px-6 py-3 border-b border-white/10 bg-blue-600 overflow-hidden">
-            <div className="info-bar-shimmer" />
-            <div className="relative flex items-center justify-between gap-3">
-              <p className="text-white/70 text-sm flex-1">
-              Describe your vision, add reference images, and pick an aspect ratio. All flagship models available!
+          {/* Info bar - dark, readable, brand gradient accent */}
+          <div className="relative z-10 px-6 py-3 border-b border-white/10 bg-[#111318]/75 backdrop-blur-sm overflow-hidden">
+            <div className="absolute bottom-0 left-0 right-0 h-px control-panel-bar-gradient" />
+            <div className="flex items-center justify-between gap-3 relative">
+              <p className="text-white/90 text-sm flex-1">
+              Describe your <span className="dashboard-title-gradient font-semibold">vision</span>, add reference images, and pick an aspect ratio. All flagship models available!
               </p>
               {onCloseMobile && (
                 <button
                   onClick={onCloseMobile}
-                  className="flex-shrink-0 text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  className="flex-shrink-0 text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                   aria-label="Minimize"
                   title="Minimize"
                 >
@@ -265,8 +259,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
           </div>
           
-          {/* Content */}
-          <div className="relative z-10 p-6">
+          {/* Content - transparency */}
+          <div className="relative z-10 p-6 bg-[#0c0d0f]/65 backdrop-blur-sm">
             {/* Reference Images Grid */}
             <div className="mb-2 py-1">
               <div
@@ -306,7 +300,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     <img
                       src={img}
                       alt={`Reference ${index + 1}`}
-                      className="w-14 h-14 object-cover rounded-lg border border-white/20 backdrop-blur-sm bg-white/5 pointer-events-none"
+                      className="w-14 h-14 object-cover rounded-lg border border-white/15 bg-[#16181c]/80 pointer-events-none"
                     />
                     <button
                       onClick={() => removeReferenceImage(index)}
@@ -319,8 +313,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <label
                   className={`flex-shrink-0 w-14 h-14 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
                     canAddMoreRefs
-                      ? 'border-white/30 cursor-pointer hover:border-white/50 bg-white/5 hover:bg-white/10'
-                      : 'border-white/20 cursor-not-allowed opacity-50'
+                      ? 'border-white/25 cursor-pointer hover:border-blue-500/50 bg-[#16181c]/80 hover:bg-[#1a1d22]/95'
+                      : 'border-white/15 cursor-not-allowed opacity-50 bg-[#16181c]/80'
                   }`}
                   title={canAddMoreRefs ? 'Add reference images (max 6)' : 'Max 6 reference images'}
                 >
@@ -332,12 +326,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     className="hidden"
                     disabled={!canAddMoreRefs}
                   />
-                  <svg className="w-6 h-6 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 </label>
               </div>
-              <p className="text-white/40 text-xs mt-1">
+              <p className="text-white/55 text-xs mt-1">
                 Max {MAX_REFERENCE_IMAGES} refs · Drag to reorder · Ctrl/Cmd+V to paste
               </p>
             </div>
@@ -351,7 +345,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   placeholder="Enter your prompt here..."
                   spellCheck
                   lang="en"
-                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4 pr-28 text-white placeholder-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 min-h-[100px] text-sm transition-all"
+                  className="w-full bg-[#16181c]/80 border border-white/15 rounded-xl p-4 pr-28 text-white placeholder-white/50 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 min-h-[100px] text-sm transition-all"
                 />
                 <button
                   type="button"
@@ -382,10 +376,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setOpenPicker(openPicker === 'aspect' ? null : 'aspect')}
-                  className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 h-9 text-white text-sm cursor-pointer hover:bg-white/10 hover:border-blue-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  className="flex items-center gap-2 bg-[#16181c]/80 border border-white/15 rounded-xl px-4 py-2 h-9 text-white text-sm cursor-pointer hover:bg-[#1a1d22]/95 hover:border-blue-500/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                 >
                   <span>{selectedAspectRatio}</span>
-                  <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -396,10 +390,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setOpenPicker(openPicker === 'quality' ? null : 'quality')}
-                  className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 h-9 text-white text-sm cursor-pointer hover:bg-white/10 hover:border-blue-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  className="flex items-center gap-2 bg-[#16181c]/80 border border-white/15 rounded-xl px-4 py-2 h-9 text-white text-sm cursor-pointer hover:bg-[#1a1d22]/95 hover:border-blue-500/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                 >
                   <span>{selectedQuality}</span>
-                  <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -410,27 +404,27 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setOpenPicker(openPicker === 'model' ? null : 'model')}
-                  className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 h-9 text-white text-sm cursor-pointer hover:bg-white/10 hover:border-blue-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  className="flex items-center gap-2 bg-[#16181c]/80 border border-white/15 rounded-xl px-4 py-2 h-9 text-white text-sm cursor-pointer hover:bg-[#1a1d22]/95 hover:border-blue-500/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                 >
                   <span>{IMAGE_MODELS[selectedModel]}</span>
-                  <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
               </div>
 
                 {/* Batch Size Select */}
-              <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 h-9">
+              <div className="flex items-center gap-2 bg-[#16181c]/80 border border-white/15 rounded-xl px-4 py-2 h-9">
                 <button
                   onClick={() => setBatchSize(Math.max(1, batchSize - 1))}
-                  className="text-white/60 hover:text-white transition-colors"
+                  className="text-white/80 hover:text-white transition-colors"
                 >
                   −
                 </button>
                 <span className="text-white text-sm min-w-[3ch] text-center">{batchSize}</span>
                 <button
                   onClick={() => setBatchSize(Math.min(8, batchSize + 1))}
-                  className="text-white/60 hover:text-white transition-colors"
+                  className="text-white/80 hover:text-white transition-colors"
                 >
                   +
                 </button>
@@ -438,7 +432,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
               {/* Credits display + Generate Button */}
               {typeof credits === 'number' && (
-                <span className="text-white/70 text-sm">
+                <span className="text-white/90 text-sm">
                   {credits} credits
                 </span>
               )}
@@ -452,15 +446,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </button>
             </div>
 
-            {/* Picker for aspect ratio & quality - anchored to bottom of panel */}
-            {(openPicker === 'aspect' || openPicker === 'quality') && (
+            {/* Picker for aspect ratio, resolution & model - anchored to bottom of panel */}
+            {(openPicker === 'aspect' || openPicker === 'quality' || openPicker === 'model') && (
               <div className="absolute inset-x-0 bottom-0 z-40">
-                <div className="relative w-full rounded-b-3xl bg-gradient-to-b from-blue-900/95 via-blue-800/95 to-blue-800/95 border-t border-blue-400/40 shadow-2xl overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-blue-400/30 pointer-events-none" />
+                <div className="relative w-full rounded-b-3xl bg-[#111318]/75 backdrop-blur-sm border-t border-white/10 shadow-2xl overflow-hidden">
                   <div className="relative z-10 p-6">
                     <h3 className="text-white font-semibold mb-4">
                       {openPicker === 'aspect' && 'Choose aspect ratio'}
                       {openPicker === 'quality' && 'Choose resolution'}
+                      {openPicker === 'model' && 'Choose AI model'}
                     </h3>
                     <div className="flex gap-2 flex-wrap">
                       {openPicker === 'aspect' &&
@@ -472,7 +466,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                               selectedAspectRatio === ratio
                                 ? 'bg-blue-500 text-white'
-                                : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
+                                : 'bg-[#16181c]/80 text-white/90 hover:bg-[#1a1d22]/95 hover:text-white border border-white/10'
                             }`}
                           >
                             {ratio}
@@ -487,58 +481,32 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                               selectedQuality === quality
                                 ? 'bg-blue-500 text-white'
-                                : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
+                                : 'bg-[#16181c]/80 text-white/90 hover:bg-[#1a1d22]/95 hover:text-white border border-white/10'
                             }`}
                           >
                             {quality}
+                          </button>
+                        ))}
+                      {openPicker === 'model' &&
+                        MODEL_IDS.map((modelId) => (
+                          <button
+                            key={modelId}
+                            type="button"
+                            onClick={() => { setSelectedModel(modelId); setOpenPicker(null); }}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                              selectedModel === modelId
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-[#16181c]/80 text-white/90 hover:bg-[#1a1d22]/95 hover:text-white border border-white/10'
+                            }`}
+                          >
+                            {IMAGE_MODELS[modelId]}
                           </button>
                         ))}
                     </div>
                     <button
                       type="button"
                       onClick={() => setOpenPicker(null)}
-                      className="mt-4 text-white/60 hover:text-white text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Model picker keeps full-screen modal behavior */}
-            {openPicker === 'model' && (
-              <div
-                className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                onClick={() => setOpenPicker(null)}
-              >
-                <div
-                  className="relative w-full max-w-lg mx-4 rounded-2xl backdrop-blur-xl bg-gradient-to-b from-white/15 via-white/10 to-white/5 border border-white/20 shadow-2xl overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-400/10 pointer-events-none" />
-                  <div className="relative z-10 p-6">
-                    <h3 className="text-white font-semibold mb-4">Choose AI model</h3>
-                    <div className="flex gap-2 flex-wrap">
-                      {MODEL_IDS.map((modelId) => (
-                        <button
-                          key={modelId}
-                          type="button"
-                          onClick={() => { setSelectedModel(modelId); setOpenPicker(null); }}
-                          className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                            selectedModel === modelId
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-white/10 text-white/80 hover:bg-blue-500/30 hover:text-white'
-                          }`}
-                        >
-                          {IMAGE_MODELS[modelId]}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpenPicker(null)}
-                      className="mt-4 text-white/60 hover:text-white text-sm"
+                      className="mt-4 text-white/70 hover:text-white text-sm"
                     >
                       Cancel
                     </button>
