@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import KreatePlusModal from './KreatePlusModal';
 
 const panelEasing = 'cubic-bezier(0.32, 0.72, 0, 1)';
@@ -14,7 +13,6 @@ interface LeftToolPanelProps {
 
 export default function LeftToolPanel({ onOpenCreate, onUseKreatePlusPrompt }: LeftToolPanelProps) {
   const [kreatePlusOpen, setKreatePlusOpen] = useState(false);
-  const navigate = useNavigate();
 
   return (
     <>
@@ -45,26 +43,6 @@ export default function LeftToolPanel({ onOpenCreate, onUseKreatePlusPrompt }: L
             title="Kreate+"
           >
             <img src="/kreate+.png" alt="Kreate+" className={iconClass} style={{ borderRadius: '50%' }} />
-          </button>
-          {/* Profile / My creator */}
-          <button
-            type="button"
-            onClick={() => navigate('/app/profile')}
-            className={`${btnCircleClass} text-white/50 hover:text-white/90 active:scale-[0.96] transition-all duration-200 bg-transparent border-0 p-0`}
-            style={{ transitionTimingFunction: panelEasing, borderRadius: '50%' }}
-            title="My creator"
-          >
-            <img src="/profile.png" alt="My creator" className={iconClass} style={{ borderRadius: '50%' }} />
-          </button>
-          {/* Architect+ — coming soon */}
-          <button
-            type="button"
-            disabled
-            className={`${btnCircleClass} text-white/40 cursor-not-allowed opacity-70 transition-all duration-200 bg-transparent border-0 p-0`}
-            style={{ transitionTimingFunction: panelEasing, borderRadius: '50%' }}
-            title="Architect+ (coming soon)"
-          >
-            <img src="/architect+.png" alt="Architect+" className={iconClass} style={{ borderRadius: '50%' }} />
           </button>
         </div>
       </div>
