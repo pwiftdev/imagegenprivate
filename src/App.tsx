@@ -220,8 +220,8 @@ function AppShell() {
     async function load() {
       setIsLoading(true);
       try {
-        const opts = { limit: 12, offset: 0 };
-        if (viewMode === 'mine') (opts as { folderId: string | null }).folderId = activeFolderId;
+        const opts: { limit: number; offset: number; folderId?: string | null } = { limit: 12, offset: 0 };
+        if (viewMode === 'mine') opts.folderId = activeFolderId;
         const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, opts);
         const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
         const creatorMap = await fetchProfilesByIds(userIds);
