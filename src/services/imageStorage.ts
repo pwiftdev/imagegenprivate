@@ -413,28 +413,6 @@ export async function fetchUserStats(userId: string): Promise<ImageStats> {
   return buildUserImageStats(rows || [], error);
 }
 
-/**
- * Fetch stats for all images (global, for StatisticsModal).
- */
-export async function fetchStatsFromSupabase(): Promise<ImageStats> {
-  if (!supabase) {
-    return {
-      totalImages: 0,
-      totalApiCalls: 0,
-      totalCost: 0,
-      monthlyOverview: [],
-      recentActivity: []
-    };
-  }
-
-  const { data: rows, error } = await supabase
-    .from('images')
-    .select('id, created_at, image_size')
-    .order('created_at', { ascending: false });
-
-  return buildUserImageStats(rows || [], error);
-}
-
 function buildUserImageStats(
   images: { id: string; created_at: string; image_size?: string | null }[],
   error: { message: string } | null
