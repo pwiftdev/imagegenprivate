@@ -491,7 +491,7 @@ function AppShell() {
     <>
       {pathname !== '/app/profile' && <Header onSignOut={signOut} credits={credits} />}
       {pathname === '/app/profile' ? (
-        <ProfilePage user={user} credits={credits} onSignOut={signOut} onRequestPasswordReset={user?.email ? () => resetPassword(user.email!) : undefined} />
+        <ProfilePage user={user} credits={credits} onSignOut={signOut} onRequestPasswordReset={user?.email ? async () => { await resetPassword(user.email!); } : undefined} />
       ) : (
     <div className="min-h-screen bg-[#08090a] pb-32 pt-16 landing-font-body relative">
       {/* Background – same vibe as landing (orbs + gradient + noise) */}
