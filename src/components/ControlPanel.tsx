@@ -349,6 +349,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   if (files.length > 0) addImagesFromFiles(Array.from(files));
                 }}
               >
+                <div className="flex flex-1 min-w-0 items-start gap-4">
                 {moodboardInUse ? (
                   <div className="flex items-start gap-4 w-full">
                     {/* Main reference */}
@@ -464,7 +465,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   </div>
                 ) : (
                   /* Default layout when no moodboard */
-                  <div className="flex items-center gap-1.5 w-full">
+                  <div className="flex items-center gap-1.5 w-full flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
                     {referenceImages.map((img, index) => {
                       const isReserved = img === RESERVED_MAIN;
@@ -566,20 +567,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         </svg>
                       </label>
                     </div>
-                {moodboards.length > 0 && onRequestMoodboardInjection && (
-                    <button
-                      type="button"
-                      onClick={() => setUseMoodboardModalOpen(true)}
-                      className="flex-shrink-0 ml-auto px-3 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 transition-colors flex items-center gap-1.5"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Use Moodboard
-                    </button>
-                  )}
-                  </div>
+                    </div>
                 )}
+                </div>
               </div>
               {!moodboardInUse && (
               <p className="text-white/55 text-xs mt-1">
@@ -625,6 +615,44 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
             {/* Settings Row */}
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Moodboard toggle - inline left */}
+              {moodboards.length > 0 && onRequestMoodboardInjection && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={moodboardInUse}
+                  aria-label="Moodboard"
+                  onClick={() => {
+                    if (moodboardInUse) {
+                      setReferenceImages([]);
+                      setReferenceImagesBase64([]);
+                      setMoodboardInUse(false);
+                      objectUrlsRef.current.forEach(url => {
+                        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+                      });
+                      objectUrlsRef.current = [];
+                    } else {
+                      setUseMoodboardModalOpen(true);
+                    }
+                  }}
+                  className="flex items-center gap-2 flex-shrink-0"
+                >
+                  <span className="text-sm font-medium text-white/80">Moodboard</span>
+                  <span
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-[#0c0d0f] ${
+                      moodboardInUse
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                        : 'bg-white/15 hover:bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                        moodboardInUse ? 'translate-x-4' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </span>
+                </button>
+              )}
               {/* Aspect Ratio */}
               <div className="relative">
                 <button
