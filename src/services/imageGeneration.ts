@@ -127,10 +127,12 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
   };
   if (params.model) body.model = params.model;
   if (params.userId) body.userId = params.userId;
-  if (params.referenceImageUrls?.length) {
-    body.referenceImageUrls = params.referenceImageUrls;
-  } else if (params.referenceImages?.length) {
+  // Prefer referenceImages (base64) when present - preserves main ref from blob uploads (moodboard flow)
+  if (params.referenceImages?.length) {
     body.referenceImages = params.referenceImages;
+  }
+  if (params.referenceImageUrls?.length && !params.referenceImages?.length) {
+    body.referenceImageUrls = params.referenceImageUrls;
   }
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
