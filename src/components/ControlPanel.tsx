@@ -340,7 +340,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* Reference Images Grid */}
             <div className="mb-2 py-1">
               <div
-                className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide"
+                className="flex items-center gap-3 flex-wrap"
                 onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -349,43 +349,209 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   if (files.length > 0) addImagesFromFiles(Array.from(files));
                 }}
               >
-                {referenceImages.map((img, index) => {
-                  const isReserved = img === RESERVED_MAIN;
-                  return (
-                  <div
-                    key={isReserved ? `reserved-${index}` : `ref-${index}-${img.slice(0, 20)}`}
-                    draggable={!isReserved}
-                    className={`relative flex-shrink-0 ${isReserved ? '' : 'cursor-grab active:cursor-grabbing'}`}
-                    onDragStart={!isReserved ? (e) => {
-                      e.dataTransfer.effectAllowed = 'move';
-                      e.dataTransfer.setData('text/plain', String(index));
-                    } : undefined}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = 'move';
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const files = e.dataTransfer.files;
-                      if (files.length > 0 && canAddMoreRefs) {
-                        addImagesFromFiles(Array.from(files));
-                      } else if (files.length === 0 && !isReserved) {
-                        const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
-                        const toIndex = index;
-                        if (!Number.isNaN(from) && from !== toIndex && referenceImages[from] !== RESERVED_MAIN && referenceImages[toIndex] !== RESERVED_MAIN) {
-                          reorderReferenceImages(from, toIndex);
-                        }
-                      }
-                    }}
-                  >
-                    {isReserved ? (
+                {moodboardInUse ? (
+                  <div className="flex items-start gap-4 w-full">
+                    {/* Main reference */}
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <span className="text-white/50 text-[11px] font-medium uppercase tracking-wider">Main reference</span>
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                        {referenceImages[0] === RESERVED_MAIN ? (
+                          <label
+                            className={`flex-shrink-0 w-20 h-20 rounded-xl border-2 border-dashed flex items-center justify-center transition-all cursor-pointer ${
+                              canAddMoreRefs
+                                ? 'border-blue-500/40 bg-blue-500/10 hover:border-blue-500/60 hover:bg-blue-500/15'
+                                : 'border-white/15 opacity-50 cursor-not-allowed'
+                            }`}
+                            title="Upload your main reference image"
+                          >
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                              disabled={!canAddMoreRefs}
+                            />
+                            <svg className="w-6 h-6 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </label>
+                        ) : (
+                          <div className="relative flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setEnlargedRefUrl(referenceImages[0])}
+                              className="block w-20 h-20 rounded-xl border border-white/15 bg-[#16181c] overflow-hidden hover:ring-2 hover:ring-blue-500/50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                              title="View larger"
+                            >
+                              <img
+                                src={referenceImages[0]}
+                                alt="Main reference"
+                                className="w-full h-full object-cover pointer-events-none"
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeReferenceImage(0); }}
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600 shadow-lg"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Moodboard group */}
+                    <div className="flex flex-col gap-2 flex-1 min-w-0">
+                      <span className="text-white/50 text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Moodboard
+                      </span>
+                      <div className="relative flex items-center gap-2 p-2.5 pr-10 rounded-xl bg-white/[0.03] border border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReferenceImages([]);
+                            setReferenceImagesBase64([]);
+                            setMoodboardInUse(false);
+                            objectUrlsRef.current.forEach(url => {
+                              if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+                            });
+                            objectUrlsRef.current = [];
+                          }}
+                          className="absolute top-2 right-2 w-6 h-6 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                          title="Exit moodboard"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                        {referenceImages.slice(1).map((img, i) => {
+                          const index = i + 1;
+                          return (
+                            <div key={`mood-${index}-${img.slice(0, 20)}`} className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setEnlargedRefUrl(img)}
+                                className="block w-20 h-20 rounded-xl border border-white/15 overflow-hidden hover:ring-2 hover:ring-blue-500/50 transition-all focus:outline-none"
+                                title="View larger"
+                              >
+                                <img src={img} alt={`Moodboard ${index}`} className="w-full h-full object-cover pointer-events-none" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); removeReferenceImage(index); }}
+                                className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] hover:bg-red-600 shadow"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {referenceImages.length > 1 && referenceImages.length < MAX_REFERENCE_IMAGES && (
+                          <label className="shrink-0 w-20 h-20 rounded-xl border border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-white/5 transition-all" title="Add to moodboard">
+                            <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="hidden" />
+                            <svg className="w-6 h-6 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Default layout when no moodboard */
+                  <div className="flex items-center gap-1.5 w-full">
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+                    {referenceImages.map((img, index) => {
+                      const isReserved = img === RESERVED_MAIN;
+                      return (
+                        <div
+                          key={isReserved ? `reserved-${index}` : `ref-${index}-${img.slice(0, 20)}`}
+                          draggable={!isReserved}
+                          className={`relative flex-shrink-0 ${isReserved ? '' : 'cursor-grab active:cursor-grabbing'}`}
+                          onDragStart={!isReserved ? (e) => {
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', String(index));
+                          } : undefined}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const files = e.dataTransfer.files;
+                            if (files.length > 0 && canAddMoreRefs) {
+                              addImagesFromFiles(Array.from(files));
+                            } else if (files.length === 0 && !isReserved) {
+                              const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                              const toIndex = index;
+                              if (!Number.isNaN(from) && from !== toIndex && referenceImages[from] !== RESERVED_MAIN && referenceImages[toIndex] !== RESERVED_MAIN) {
+                                reorderReferenceImages(from, toIndex);
+                              }
+                            }
+                          }}
+                        >
+                          {isReserved ? (
+                            <label
+                              className={`flex-shrink-0 w-14 h-14 border-2 border-dashed rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                canAddMoreRefs
+                                  ? 'border-blue-400/40 bg-blue-500/10 hover:border-blue-500/60 hover:bg-blue-500/15'
+                                  : 'border-white/15 opacity-50 cursor-not-allowed'
+                              }`}
+                              title="Main reference (required)"
+                            >
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={handleFileUpload}
+                                className="hidden"
+                                disabled={!canAddMoreRefs}
+                              />
+                              <svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                            </label>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setEnlargedRefUrl(img)}
+                                className="block w-14 h-14 rounded-lg border border-white/15 bg-[#16181c]/80 overflow-hidden hover:ring-2 hover:ring-blue-500/50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                title="View larger"
+                              >
+                                <img
+                                  src={img}
+                                  alt={`Reference ${index + 1}`}
+                                  className="w-full h-full object-cover pointer-events-none"
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeReferenceImage(index);
+                                }}
+                                className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white text-[10px] hover:bg-red-600 transition-colors border border-white/20"
+                              >
+                                ×
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                       <label
-                        className={`flex-shrink-0 w-14 h-14 border-2 border-dashed rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                        className={`flex-shrink-0 w-14 h-14 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
                           canAddMoreRefs
-                            ? 'border-blue-400/40 bg-blue-500/10 hover:border-blue-500/60 hover:bg-blue-500/15'
-                            : 'border-white/15 opacity-50 cursor-not-allowed'
+                            ? 'border-white/25 cursor-pointer hover:border-blue-500/50 bg-[#16181c]/80 hover:bg-[#1a1d22]/95'
+                            : 'border-white/15 cursor-not-allowed opacity-50 bg-[#16181c]/80'
                         }`}
-                        title="Main reference (required)"
+                        title={canAddMoreRefs ? 'Add reference images (max 6)' : 'Max 6 reference images'}
                       >
                         <input
                           type="file"
@@ -395,75 +561,31 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           className="hidden"
                           disabled={!canAddMoreRefs}
                         />
-                        <svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-6 h-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                       </label>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setEnlargedRefUrl(img)}
-                          className="block w-14 h-14 rounded-lg border border-white/15 bg-[#16181c]/80 overflow-hidden hover:ring-2 hover:ring-blue-500/50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                          title="View larger"
-                        >
-                          <img
-                            src={img}
-                            alt={`Reference ${index + 1}`}
-                            className="w-full h-full object-cover pointer-events-none"
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeReferenceImage(index);
-                          }}
-                          className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white text-[10px] hover:bg-red-600 transition-colors border border-white/20"
-                        >
-                          ×
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  );
-                })}
-                <label
-                  className={`flex-shrink-0 w-14 h-14 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
-                    canAddMoreRefs
-                      ? 'border-white/25 cursor-pointer hover:border-blue-500/50 bg-[#16181c]/80 hover:bg-[#1a1d22]/95'
-                      : 'border-white/15 cursor-not-allowed opacity-50 bg-[#16181c]/80'
-                  }`}
-                  title={canAddMoreRefs ? 'Add reference images (max 6)' : 'Max 6 reference images'}
-                >
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    disabled={!canAddMoreRefs}
-                  />
-                  <svg className="w-6 h-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </label>
+                    </div>
                 {moodboards.length > 0 && onRequestMoodboardInjection && (
-                  <button
-                    type="button"
-                    onClick={() => setUseMoodboardModalOpen(true)}
-                    className="flex-shrink-0 ml-auto px-3 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 transition-colors flex items-center gap-1.5"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Use Moodboard
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseMoodboardModalOpen(true)}
+                      className="flex-shrink-0 ml-auto px-3 py-2 rounded-lg text-sm font-medium text-white/90 hover:text-white bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 transition-colors flex items-center gap-1.5"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Use Moodboard
+                    </button>
+                  )}
+                  </div>
                 )}
               </div>
+              {!moodboardInUse && (
               <p className="text-white/55 text-xs mt-1">
                 Max {MAX_REFERENCE_IMAGES} refs · Drag to reorder · Ctrl/Cmd+V to paste
               </p>
+            )}
             </div>
 
             {/* Prompt Input */}

@@ -21,6 +21,9 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
 
+/** Must match ControlPanel MOODBOARD_PROMPT_PREFIX - used to detect moodboard-generated images */
+const MOODBOARD_PROMPT_PREFIX = 'First reference photo is the main reference. All other reference images are moodboard, to help you reach the final output for the prompt. ';
+
 const ImageModal: React.FC<ImageModalProps> = ({
   imageUrl,
   prompt,
@@ -43,6 +46,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const usedMoodboard = Boolean(prompt?.startsWith(MOODBOARD_PROMPT_PREFIX));
+  const displayPrompt = usedMoodboard && prompt ? prompt.slice(MOODBOARD_PROMPT_PREFIX.length).trim() : prompt;
 
   const resetView = useCallback(() => {
     setZoom(1);
@@ -186,11 +192,12 @@ const ImageModal: React.FC<ImageModalProps> = ({
   }, [imageUrl, prompt]);
 
   const handleReusePrompt = useCallback(() => {
-    if (prompt?.trim() && onReusePrompt) {
-      onReusePrompt(prompt.trim(), referenceImageUrls);
+    const textToReuse = (displayPrompt ?? prompt)?.trim();
+    if (textToReuse && onReusePrompt) {
+      onReusePrompt(textToReuse, referenceImageUrls);
       onClose();
     }
-  }, [prompt, referenceImageUrls, onReusePrompt, onClose]);
+  }, [displayPrompt, prompt, referenceImageUrls, onReusePrompt, onClose]);
 
   const handleDelete = useCallback(async () => {
     if (!imageId || !onDelete) return;
@@ -362,36 +369,58 @@ const ImageModal: React.FC<ImageModalProps> = ({
               <p className="text-white/50 text-xs">By Kreator, for creators.</p>
             </div>
 
-            {prompt && (
+            {usedMoodboard && (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-300 text-xs font-medium">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Created with moodboard
+                </span>
+              </div>
+            )}
+
+            {(displayPrompt ?? prompt) && (
               <div>
                 <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1">
                   Prompt
                 </p>
-                <p className="text-white/90 text-sm leading-relaxed">{prompt}</p>
+                <p className="text-white/90 text-sm leading-relaxed">{displayPrompt ?? prompt}</p>
               </div>
             )}
 
             {referenceImageUrls && referenceImageUrls.length > 0 && (
               <div>
                 <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-2">
-                  Reference photos
+                  {usedMoodboard ? 'Main reference & moodboard' : 'Reference photos'}
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {referenceImageUrls.map((url, i) => (
-                    <a
-                      key={`${url}-${i}`}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-14 h-14 rounded-lg overflow-hidden border border-white/20 hover:border-white/40 transition-colors flex-shrink-0"
-                    >
-                      <img
-                        src={url}
-                        alt={`Reference ${i + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </a>
-                  ))}
+                <div className="flex flex-wrap gap-3">
+                  {referenceImageUrls.map((url, i) => {
+                    const label = usedMoodboard
+                      ? i === 0
+                        ? 'Main reference'
+                        : `Moodboard ${i}`
+                      : `Reference ${i + 1}`;
+                    return (
+                      <div key={`${url}-${i}`} className="flex flex-col items-start gap-1">
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-14 h-14 rounded-lg overflow-hidden border border-white/20 hover:border-white/40 transition-colors flex-shrink-0"
+                        >
+                          <img
+                            src={url}
+                            alt={label}
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                        <span className="text-white/50 text-[10px] font-medium max-w-[56px] truncate" title={label}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -480,7 +509,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 Share
               </button>
             )}
-            {prompt?.trim() && onReusePrompt && (
+            {(displayPrompt ?? prompt)?.trim() && onReusePrompt && (
               <button
                 onClick={handleReusePrompt}
                 className="w-full flex items-center justify-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 py-2.5 rounded-xl text-sm font-medium transition-all"

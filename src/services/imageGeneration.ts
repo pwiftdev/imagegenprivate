@@ -127,11 +127,12 @@ export async function generateImage(params: ImageGenerationParams): Promise<Gene
   };
   if (params.model) body.model = params.model;
   if (params.userId) body.userId = params.userId;
-  // Prefer referenceImages (base64) when present - preserves main ref from blob uploads (moodboard flow)
+  // referenceImages (base64) for generation - includes main ref from blob uploads (moodboard flow)
   if (params.referenceImages?.length) {
     body.referenceImages = params.referenceImages;
   }
-  if (params.referenceImageUrls?.length && !params.referenceImages?.length) {
+  // referenceImageUrls for DB persistence (backend saves for modal display) - send when we have URLs
+  if (params.referenceImageUrls?.length) {
     body.referenceImageUrls = params.referenceImageUrls;
   }
 
