@@ -12,6 +12,7 @@ import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupaba
 import { fetchProfilesByIds, fetchProfile, updateProfile } from './services/profileService';
 import { fetchFolders, createFolder, type Folder } from './services/folderService';
 import { fetchMoodboards, type Moodboard } from './services/moodboardService';
+import { submitFeedback } from './services/feedbackService';
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import { IMAGE_MODELS } from './services/imageGeneration';
@@ -156,6 +157,11 @@ function AppShell() {
   const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
   const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
   const [hasMoreImages, setHasMoreImages] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -535,6 +541,25 @@ function AppShell() {
     setControlPanelOpen(true);
   }, []);
 
+  const handleSubmitFeedback = useCallback(async () => {
+    setFeedbackError(null);
+    if (!feedbackMessage.trim()) {
+      setFeedbackError('Please write your feedback.');
+      return;
+    }
+    setFeedbackSubmitting(true);
+    try {
+      await submitFeedback({ message: feedbackMessage.trim(), email: feedbackEmail.trim() || undefined });
+      setFeedbackModalOpen(false);
+      setFeedbackMessage('');
+      setFeedbackEmail('');
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : 'Failed to send feedback');
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  }, [feedbackMessage, feedbackEmail]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -613,6 +638,78 @@ function AppShell() {
             >
               ×
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Feedback button - bottom left edge */}
+      <button
+        type="button"
+        onClick={() => setFeedbackModalOpen(true)}
+        className="fixed bottom-4 left-4 z-[100] flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium bg-white/10 hover:bg-white/15 border border-white/20 text-white/90 hover:text-white backdrop-blur-sm transition-colors shadow-lg"
+        aria-label="Send feedback"
+      >
+        <span>Feedback</span>
+        <span aria-hidden>❤️</span>
+      </button>
+
+      {/* Feedback modal */}
+      {feedbackModalOpen && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => !feedbackSubmitting && setFeedbackModalOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && !feedbackSubmitting && setFeedbackModalOpen(false)}
+          tabIndex={0}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-modal-title"
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl bg-[#0d0e10] border border-white/10 shadow-xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="feedback-modal-title" className="text-lg font-semibold text-white mb-2">
+              Send us feedback
+            </h3>
+            <p className="text-white/60 text-sm mb-4">
+              We love hearing from you. Share your thoughts, bugs, or feature ideas.
+            </p>
+            <textarea
+              value={feedbackMessage}
+              onChange={(e) => setFeedbackMessage(e.target.value)}
+              placeholder="Your feedback..."
+              rows={4}
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 resize-none mb-3"
+              disabled={feedbackSubmitting}
+            />
+            <input
+              type="email"
+              value={feedbackEmail}
+              onChange={(e) => setFeedbackEmail(e.target.value)}
+              placeholder="Email (optional)"
+              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 mb-4"
+              disabled={feedbackSubmitting}
+            />
+            {feedbackError && (
+              <p className="text-red-400/90 text-sm mb-3">{feedbackError}</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => !feedbackSubmitting && setFeedbackModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white/80 hover:text-white bg-white/10 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitFeedback}
+                disabled={feedbackSubmitting || !feedbackMessage.trim()}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {feedbackSubmitting ? 'Sending…' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
       )}
