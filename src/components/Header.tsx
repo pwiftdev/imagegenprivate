@@ -25,11 +25,16 @@ const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {typeof credits === 'number' && (
-          <span className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-200 text-xs font-semibold">
-            {credits} credits
-          </span>
-        )}
+        <button
+          onClick={onSignOut}
+          type="button"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-white/80 text-xs font-medium border border-white/10 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Sign out
+        </button>
         <Link
           to="/app/profile"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -43,16 +48,11 @@ const Header: React.FC<HeaderProps> = ({ onSignOut, credits }) => {
           </svg>
           My Kreator
         </Link>
-        <button
-          onClick={onSignOut}
-          type="button"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-white/80 text-xs font-medium border border-white/10 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Sign out
-        </button>
+        {typeof credits === 'number' && (
+          <span className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-200 text-xs font-semibold">
+            {credits} credits
+          </span>
+        )}
       </div>
     </header>
   );

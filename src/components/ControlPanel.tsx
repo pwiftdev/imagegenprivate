@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { compressImageForReference, compressImageFromUrl } from '../utils/compressImage';
 import { enhancePrompt } from '../services/promptEnhancer';
 import type { ImageGenerationParams, ImageModelId } from '../services/imageGeneration';
 import { IMAGE_MODELS } from '../services/imageGeneration';
+import { SHOW_KREATE_PLUS } from '../constants/features';
 interface ControlPanelProps {
   onGenerate?: (params: ImageGenerationParams, batchSize: number) => void;
   credits?: number | null;
@@ -44,17 +46,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [openPicker, setOpenPicker] = useState<'aspect' | 'quality' | 'model' | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
+  const [enlargedRefUrl, setEnlargedRefUrl] = useState<string | null>(null);
   
   const objectUrlsRef = useRef<string[]>([]);
 
   useEffect(() => {
-    if (!openPicker) return;
     const onEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpenPicker(null);
+      if (e.key === 'Escape') {
+        setEnlargedRefUrl(null);
+        setOpenPicker(null);
+      }
     };
     window.addEventListener('keydown', onEscape);
     return () => window.removeEventListener('keydown', onEscape);
-  }, [openPicker]);
+  }, []);
 
   useEffect(() => {
     if (promptToInject?.trim()) {
@@ -65,46 +70,53 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   useEffect(() => {
     if (!referenceImageUrlToInject?.trim()) return;
+    const url = referenceImageUrlToInject.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      onReferenceImageInjected?.();
+      return;
+    }
+    onReferenceImageInjected?.();
     (async () => {
       try {
-        const base64 = await compressImageFromUrl(referenceImageUrlToInject);
+        const base64 = await compressImageFromUrl(url);
+        let didAdd = false;
         setReferenceImages(prev => {
-          if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
-          return [...prev, referenceImageUrlToInject];
+          if (prev.includes(url) || prev.length >= MAX_REFERENCE_IMAGES) return prev;
+          didAdd = true;
+          return [...prev, url];
         });
-        setReferenceImagesBase64(prev => {
-          if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
-          return [...prev, base64];
-        });
-        onReferenceImageInjected?.();
+        if (didAdd) {
+          setReferenceImagesBase64(prev => (prev.length >= MAX_REFERENCE_IMAGES ? prev : [...prev, base64]));
+        }
       } catch (err) {
         console.error('Failed to add reference image:', err);
-      } finally {
-        onReferenceImageInjected?.();
       }
     })();
   }, [referenceImageUrlToInject, onReferenceImageInjected]);
 
   useEffect(() => {
     if (!referenceImageUrlsToInject?.length || !onReferenceImagesInjected) return;
-    (async () => {
-      const urls = referenceImageUrlsToInject;
+    const urls = [...new Set(referenceImageUrlsToInject.filter((u): u is string => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://'))))].slice(0, MAX_REFERENCE_IMAGES);
+    if (urls.length === 0) {
       onReferenceImagesInjected();
+      return;
+    }
+    onReferenceImagesInjected();
+    (async () => {
+      const newUrls: string[] = [];
+      const newBase64: string[] = [];
       for (const url of urls) {
-        if (typeof url !== 'string' || !url.startsWith('http')) continue;
         try {
           const base64 = await compressImageFromUrl(url);
-          setReferenceImages(prev => {
-            if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
-            return [...prev, url];
-          });
-          setReferenceImagesBase64(prev => {
-            if (prev.length >= MAX_REFERENCE_IMAGES) return prev;
-            return [...prev, base64];
-          });
+          newUrls.push(url);
+          newBase64.push(base64);
         } catch (err) {
           console.error('Failed to add reference image from Re-run:', err);
         }
+      }
+      if (newUrls.length > 0) {
+        setReferenceImages(newUrls);
+        setReferenceImagesBase64(newBase64);
       }
     })();
   }, [referenceImageUrlsToInject, onReferenceImagesInjected]);
@@ -293,13 +305,24 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       }
                     }}
                   >
-                    <img
-                      src={img}
-                      alt={`Reference ${index + 1}`}
-                      className="w-14 h-14 object-cover rounded-lg border border-white/15 bg-[#16181c]/80 pointer-events-none"
-                    />
                     <button
-                      onClick={() => removeReferenceImage(index)}
+                      type="button"
+                      onClick={() => setEnlargedRefUrl(img)}
+                      className="block w-14 h-14 rounded-lg border border-white/15 bg-[#16181c]/80 overflow-hidden hover:ring-2 hover:ring-blue-500/50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      title="View larger"
+                    >
+                      <img
+                        src={img}
+                        alt={`Reference ${index + 1}`}
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeReferenceImage(index);
+                      }}
                       className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white text-[10px] hover:bg-red-600 transition-colors border border-white/20"
                     >
                       ×
@@ -341,26 +364,28 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   placeholder="Enter your prompt here..."
                   spellCheck
                   lang="en"
-                  className="w-full bg-[#16181c]/80 border border-white/15 rounded-xl p-4 pr-28 text-white placeholder-white/50 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 min-h-[100px] text-sm transition-all"
+                  className={`w-full bg-[#16181c]/80 border border-white/15 rounded-xl p-4 ${SHOW_KREATE_PLUS ? 'pr-28' : 'pr-4'} text-white placeholder-white/50 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 min-h-[100px] text-sm transition-all`}
                 />
-                <button
-                  type="button"
-                  onClick={handleEnhanceClick}
-                  disabled={!prompt.trim() || isEnhancing}
-                  className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500/20"
-                  title="Enhance prompt with AI"
-                >
-                  {isEnhancing ? (
-                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-amber-400/50 border-t-amber-300" />
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  )}
-                  Kreate+
-                </button>
+                {SHOW_KREATE_PLUS && (
+                  <button
+                    type="button"
+                    onClick={handleEnhanceClick}
+                    disabled={!prompt.trim() || isEnhancing}
+                    className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500/20"
+                    title="Enhance prompt with AI"
+                  >
+                    {isEnhancing ? (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-amber-400/50 border-t-amber-300" />
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    )}
+                    Kreate+
+                  </button>
+                )}
               </div>
-              {enhanceError && (
+              {SHOW_KREATE_PLUS && enhanceError && (
                 <p className="mt-1.5 text-red-400/90 text-xs">{enhanceError}</p>
               )}
             </div>
@@ -517,6 +542,41 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Enlarged reference photo lightbox - portal to body so fixed covers viewport */}
+      {enlargedRefUrl && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-12 bg-black/95 backdrop-blur-md"
+          onClick={() => setEnlargedRefUrl(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Escape' && setEnlargedRefUrl(null)}
+          aria-label="Close"
+        >
+          <div
+            className="relative max-w-[90vw] max-h-[90vh] rounded-xl overflow-hidden ring-1 ring-white/10 shadow-[0_0_80px_rgba(59,130,246,0.15)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={enlargedRefUrl}
+              alt="Reference (enlarged)"
+              className="max-w-full max-h-[85vh] object-contain block"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setEnlargedRefUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/90 hover:text-white transition-all backdrop-blur-sm border border-white/20"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm">Click outside or press ESC to close</p>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

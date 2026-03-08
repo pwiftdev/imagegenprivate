@@ -371,6 +371,31 @@ const ImageModal: React.FC<ImageModalProps> = ({
               </div>
             )}
 
+            {referenceImageUrls && referenceImageUrls.length > 0 && (
+              <div>
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-2">
+                  Reference photos
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {referenceImageUrls.map((url, i) => (
+                    <a
+                      key={`${url}-${i}`}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-14 h-14 rounded-lg overflow-hidden border border-white/20 hover:border-white/40 transition-colors flex-shrink-0"
+                    >
+                      <img
+                        src={url}
+                        alt={`Reference ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-4 text-sm flex-wrap">
               {aspectRatio && (
                 <div>

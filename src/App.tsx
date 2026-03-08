@@ -5,7 +5,6 @@ import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
 import ImageModal from './components/ImageModal';
 import AuthScreen from './components/AuthScreen';
-import LeftToolPanel from './components/LeftToolPanel';
 import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { generateImage, getActiveJobIds, pollJobUntilComplete } from './services/imageGeneration';
@@ -25,6 +24,8 @@ type GridItem =
 interface QueuedJob {
   id: string;
   params: ImageGenerationParams;
+  /** Folder ID at job start - used when saving so image goes to correct folder even if user switches folders */
+  folderId: string | null;
 }
 
 const MAX_CONCURRENT = 3;
@@ -372,10 +373,11 @@ function AppShell() {
               creator: currentUserCreator ?? undefined,
             };
           } else {
+            const targetFolderId = job.folderId;
             try {
               const stored = img.storagePath
-                ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls, img.thumbStoragePath, activeFolderId)
-                : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls, activeFolderId);
+                ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls, img.thumbStoragePath, targetFolderId)
+                : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls, targetFolderId);
               gridImage = {
                 type: 'image',
                 id: stored.id,
@@ -419,7 +421,7 @@ function AppShell() {
           setRunningCount((c) => c - 1);
         });
     });
-  }, [queue, runningCount, currentUserCreator, refetchCredits, activeFolderId]);
+  }, [queue, runningCount, currentUserCreator, refetchCredits]);
 
   useEffect(() => {
     processQueue();
@@ -439,7 +441,7 @@ function AppShell() {
 
     for (let i = 0; i < batchSize; i++) {
       const id = nextJobId();
-      jobs.push({ id, params: paramsWithUser });
+      jobs.push({ id, params: paramsWithUser, folderId: activeFolderId });
       placeholders.push({
         type: 'placeholder',
         id,
@@ -452,7 +454,7 @@ function AppShell() {
     setGridItems((prev) => [...placeholders, ...prev]);
     setQueue((q) => [...q, ...jobs]);
     setCredits((c) => (c !== null ? Math.max(0, c - batchSize) : c));
-  }, [user?.id]);
+  }, [user?.id, activeFolderId]);
 
   const handleImageClick = useCallback((index: number) => {
     setSelectedImageIndex(index);
@@ -513,7 +515,9 @@ function AppShell() {
   const handleReRun = useCallback((prompt: string, referenceImageUrls?: string[]) => {
     setPromptToInject(prompt);
     if (referenceImageUrls && referenceImageUrls.length > 0) {
-      setReferenceImageUrlsToInject(referenceImageUrls);
+      const valid = referenceImageUrls.filter((u): u is string => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://')));
+      const deduped = [...new Set(valid)];
+      setReferenceImageUrlsToInject(deduped.length ? deduped : null);
     } else {
       setReferenceImageUrlsToInject(null);
     }
@@ -574,15 +578,6 @@ function AppShell() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.08),transparent)]" />
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.02\'/%3E%3C/svg%3E')]" />
       </div>
-
-      {/* Left pill tool panel - popup with placeholder feature buttons */}
-      <LeftToolPanel
-        onOpenCreate={() => setControlPanelOpen(true)}
-        onUseKreatePlusPrompt={(prompt) => {
-          setPromptToInject(prompt);
-          setControlPanelOpen(true);
-        }}
-      />
 
       {/* Error notification */}
       {error && (
