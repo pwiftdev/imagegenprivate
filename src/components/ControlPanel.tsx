@@ -220,9 +220,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     if (referenceImagesBase64.length > 0) {
       params.referenceImages = referenceImagesBase64;
     }
+    // Send URL refs when we have them so the backend can store them and Re-run gets refs
+    const refUrls = referenceImages.filter((u): u is string => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://')));
+    if (refUrls.length > 0) {
+      params.referenceImageUrls = refUrls;
+    }
 
     onGenerate(params, batchSize);
-  }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, selectedModel, referenceImagesBase64, batchSize]);
+  }, [onGenerate, prompt, selectedAspectRatio, selectedQuality, selectedModel, referenceImagesBase64, referenceImages, batchSize]);
 
   return (
     <div className={`w-[96%] md:w-[50%] mb-8 px-1 md:px-4 ${className ?? ''}`}>

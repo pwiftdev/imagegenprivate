@@ -677,8 +677,11 @@ function AppShell() {
             aspectRatio={item.aspectRatio}
             imageSize={item.imageSize}
             model={item.model}
+            referenceImageUrls={item.referenceImageUrls}
             onClose={handleCloseModal}
-            onReusePrompt={setPromptToInject}
+            onReusePrompt={(promptText, refUrls) => {
+              handleReRun(promptText, refUrls);
+            }}
             onPrev={onPrev}
             onNext={onNext}
             hasPrev={hasPrev}

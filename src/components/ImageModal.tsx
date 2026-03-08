@@ -6,8 +6,9 @@ interface ImageModalProps {
   aspectRatio?: string;
   imageSize?: string;
   model?: string;
+  referenceImageUrls?: string[];
   onClose: () => void;
-  onReusePrompt?: (prompt: string) => void;
+  onReusePrompt?: (prompt: string, referenceImageUrls?: string[]) => void;
   onPrev?: () => void;
   onNext?: () => void;
   hasPrev?: boolean;
@@ -24,6 +25,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
   aspectRatio,
   imageSize,
   model,
+  referenceImageUrls,
   onClose,
   onReusePrompt,
   onPrev,
@@ -180,10 +182,10 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
   const handleReusePrompt = useCallback(() => {
     if (prompt?.trim() && onReusePrompt) {
-      onReusePrompt(prompt.trim());
+      onReusePrompt(prompt.trim(), referenceImageUrls);
       onClose();
     }
-  }, [prompt, onReusePrompt, onClose]);
+  }, [prompt, referenceImageUrls, onReusePrompt, onClose]);
 
   const isShareSupported =
     typeof navigator !== 'undefined' && typeof navigator.share === 'function';
