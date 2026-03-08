@@ -49,7 +49,7 @@ export default function LeftToolPanel({ onOpenCreate, onUseKreatePlusPrompt }: L
           {/* Profile / My creator */}
           <button
             type="button"
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate('/app/profile')}
             className={`${btnCircleClass} text-white/50 hover:text-white/90 active:scale-[0.96] transition-all duration-200 bg-transparent border-0 p-0`}
             style={{ transitionTimingFunction: panelEasing, borderRadius: '50%' }}
             title="My creator"

@@ -9,8 +9,9 @@ import LeftToolPanel from './components/LeftToolPanel';
 import ProfilePage from './components/ProfilePage';
 import { useAuth } from './hooks/useAuth';
 import { generateImage, getActiveJobIds, pollJobUntilComplete } from './services/imageGeneration';
-import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupabase } from './services/imageStorage';
+import { saveImageToSupabase, saveImageMetadataToSupabase, fetchImagesFromSupabase, deleteImage } from './services/imageStorage';
 import { fetchProfilesByIds, fetchProfile, updateProfile } from './services/profileService';
+import { fetchFolders, createFolder, type Folder } from './services/folderService';
 import { recordGeneration } from './services/stats';
 import type { ImageGenerationParams } from './services/imageGeneration';
 import { IMAGE_MODELS } from './services/imageGeneration';
@@ -138,7 +139,13 @@ function AppShell() {
   const [error, setError] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [qualityFilter, setQualityFilter] = useState<'All' | '1K' | '2K' | '4K'>('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null); // null = "My Kreations"
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [createFolderName, setCreateFolderName] = useState('');
+  const [createFolderSubmitting, setCreateFolderSubmitting] = useState(false);
   const [promptToInject, setPromptToInject] = useState<string | null>(null);
   const [referenceImageUrlToInject, setReferenceImageUrlToInject] = useState<string | null>(null);
   const [referenceImageUrlsToInject, setReferenceImageUrlsToInject] = useState<string[] | null>(null);
@@ -180,22 +187,42 @@ function AppShell() {
     void refetchCredits();
   }, [refetchCredits]);
 
+  // Load folders when user is set (mine view only uses them)
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchFolders(user.id)
+      .then(setFolders)
+      .catch((err) => {
+        console.error('Failed to load folders:', err);
+        setFolders([]);
+      });
+  }, [user?.id]);
+
   const filteredGridItems = useMemo(() => {
-    if (qualityFilter === 'All') return gridItems;
-    return gridItems.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
-  }, [gridItems, qualityFilter]);
+    let list = gridItems;
+    if (qualityFilter !== 'All') {
+      list = list.filter((item) => (item.type === 'image' ? item.imageSize : item.imageSize) === qualityFilter);
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((item) => item.type === 'placeholder' || (item.type === 'image' && item.prompt?.toLowerCase().includes(q)));
+    }
+    return list;
+  }, [gridItems, qualityFilter, searchQuery]);
 
   useEffect(() => {
     imageCountRef.current = gridItems.filter((i) => i.type === 'image').length;
   }, [gridItems]);
 
-  // Load images from Supabase (paginated, refetch when viewMode/refreshKey changes)
+  // Load images from Supabase (paginated, refetch when viewMode/refreshKey/activeFolderId changes)
   useEffect(() => {
     if (!user) return;
     async function load() {
       setIsLoading(true);
       try {
-        const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 12, offset: 0 });
+        const opts = { limit: 12, offset: 0 };
+        if (viewMode === 'mine') (opts as { folderId: string | null }).folderId = activeFolderId;
+        const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, opts);
         const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
         const creatorMap = await fetchProfilesByIds(userIds);
         const newImages: GridItem[] = stored
@@ -229,14 +256,16 @@ function AppShell() {
       }
     }
     load();
-  }, [user?.id, viewMode, imagesRefreshKey]);
+  }, [user?.id, viewMode, imagesRefreshKey, activeFolderId]);
 
   const loadMoreImages = useCallback(async () => {
     if (!user || isLoadingMore || !hasMoreImages) return;
     const offset = imageCountRef.current;
     setIsLoadingMore(true);
     try {
-      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, { limit: 12, offset });
+      const opts: { limit: number; offset: number; folderId?: string | null } = { limit: 12, offset };
+      if (viewMode === 'mine') opts.folderId = activeFolderId;
+      const { images: stored, hasMore } = await fetchImagesFromSupabase(viewMode, opts);
       const userIds = [...new Set(stored.map((img) => img.user_id).filter(Boolean))] as string[];
       const creatorMap = await fetchProfilesByIds(userIds);
       const moreImages: GridItem[] = stored.map((img) => ({
@@ -258,7 +287,7 @@ function AppShell() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [user?.id, viewMode, hasMoreImages, isLoadingMore]);
+  }, [user?.id, viewMode, hasMoreImages, isLoadingMore, activeFolderId]);
 
   // Infinite scroll: load more when sentinel enters viewport
   useEffect(() => {
@@ -338,8 +367,8 @@ function AppShell() {
           } else {
             try {
               const stored = img.storagePath
-                ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls, img.thumbStoragePath)
-                : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls);
+                ? await saveImageMetadataToSupabase(img.storagePath, img.prompt, img.aspectRatio, img.imageSize, refUrls, img.thumbStoragePath, activeFolderId)
+                : await saveImageToSupabase(img.base64Data, img.prompt, img.aspectRatio, img.imageSize, refUrls, activeFolderId);
               gridImage = {
                 type: 'image',
                 id: stored.id,
@@ -383,7 +412,7 @@ function AppShell() {
           setRunningCount((c) => c - 1);
         });
     });
-  }, [queue, runningCount, currentUserCreator, refetchCredits]);
+  }, [queue, runningCount, currentUserCreator, refetchCredits, activeFolderId]);
 
   useEffect(() => {
     processQueue();
@@ -425,6 +454,35 @@ function AppShell() {
   const handleCloseModal = useCallback(() => {
     setSelectedImageIndex(null);
   }, []);
+
+  const handleDeleteImage = useCallback(async (imageId: string) => {
+    try {
+      await deleteImage(imageId);
+      setGridItems((prev) => prev.filter((item) => item.type !== 'image' || item.id !== imageId));
+      setSelectedImageIndex(null);
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete image');
+    }
+  }, []);
+
+  const handleCreateFolder = useCallback(async () => {
+    if (!user?.id || !createFolderName.trim()) return;
+    setCreateFolderSubmitting(true);
+    try {
+      const folder = await createFolder(user.id, createFolderName.trim());
+      setFolders((prev) => [...prev, folder]);
+      setActiveFolderId(folder.id);
+      setCreateFolderOpen(false);
+      setCreateFolderName('');
+      setImagesRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error('Create folder failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create folder');
+    } finally {
+      setCreateFolderSubmitting(false);
+    }
+  }, [user?.id, createFolderName]);
 
   const handleAddToReference = useCallback((url: string) => {
     setReferenceImageUrlToInject(url);
@@ -536,6 +594,42 @@ function AppShell() {
         </div>
       )}
 
+      {/* Create folder modal */}
+      {createFolderOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => !createFolderSubmitting && setCreateFolderOpen(false)}>
+          <div className="bg-[#0d0e10] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="landing-font-display text-lg font-semibold text-white mb-2">New project</h3>
+            <p className="text-white/55 text-sm mb-4">Create a folder to organize images for this project.</p>
+            <input
+              type="text"
+              value={createFolderName}
+              onChange={(e) => setCreateFolderName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+              placeholder="Project name"
+              className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:border-blue-500/50 mb-4"
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => !createFolderSubmitting && setCreateFolderOpen(false)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white/80 hover:text-white bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateFolder}
+                disabled={createFolderSubmitting || !createFolderName.trim()}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
+              >
+                {createFolderSubmitting ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading indicator */}
       {runningCount > 0 && (
         <div className="fixed top-16 right-6 z-50">
@@ -563,14 +657,65 @@ function AppShell() {
                 ? 'Your creative hub — track your work and explore new ideas'
                 : 'Discover what the community is creating'}
             </p>
+            {viewMode === 'mine' && (
+              <div className="flex items-center gap-2 mt-4 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setActiveFolderId(null)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    activeFolderId === null
+                      ? 'bg-blue-500/25 text-white border border-blue-400/40'
+                      : 'bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  My Kreations
+                </button>
+                {folders.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setActiveFolderId(f.id)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                      activeFolderId === f.id
+                        ? 'bg-blue-500/25 text-white border border-blue-400/40'
+                        : 'bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {f.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCreateFolderOpen(true)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:text-white border-dashed transition-all flex items-center gap-1.5"
+                >
+                  <span aria-hidden>+</span> New folder
+                </button>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-3 flex-wrap pr-[7px]">
-            <button
-              onClick={() => setViewMode(viewMode === 'mine' ? 'all' : 'mine')}
-              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
-            >
-              {viewMode === 'mine' ? 'Explore community' : 'Back to my Kreations'}
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => setViewMode(viewMode === 'mine' ? 'all' : 'mine')}
+                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-medium transition-all"
+              >
+                {viewMode === 'mine' ? 'Explore community' : 'Back to my Kreations'}
+              </button>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </span>
+                <input
+                  type="search"
+                  placeholder="Search prompts…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm w-48 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30"
+                  aria-label="Search by prompt"
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               {(['All', '1K', '2K', '4K'] as const).map((q) => (
                 <button
@@ -596,24 +741,55 @@ function AppShell() {
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/30 border-t-white"></div>
           </div>
         ) : (() => {
-          return filteredGridItems.length === 0 ? (
-            <div className="flex items-center justify-center min-h-[60vh] text-white/40 text-center px-4">
-              <div>
-                <svg className="w-24 h-24 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-lg">
-                  {viewMode === 'mine'
-                    ? (qualityFilter === 'All' ? 'No images yet' : `No ${qualityFilter} images`)
-                    : (qualityFilter === 'All' ? 'No one has shared yet' : `No ${qualityFilter} images`)}
+          const isEmpty = filteredGridItems.length === 0;
+          const isMineEmptyAll = viewMode === 'mine' && qualityFilter === 'All' && !searchQuery.trim();
+          const noImagesYet = isMineEmptyAll && gridItems.filter((i) => i.type === 'image').length === 0;
+          const noCredits = credits === 0;
+          return isEmpty ? (
+            <div className="flex items-center justify-center min-h-[60vh] text-center px-4">
+              <div className="max-w-sm">
+                <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                  <svg className="w-10 h-10 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h2 className="landing-font-display text-xl font-bold text-white mb-2">
+                  {searchQuery.trim()
+                    ? 'No matches'
+                    : viewMode === 'mine'
+                      ? (qualityFilter === 'All' ? 'No kreations yet' : `No ${qualityFilter} images`)
+                      : (qualityFilter === 'All' ? 'No one has shared yet' : `No ${qualityFilter} images`)}
+                </h2>
+                <p className="text-white/55 text-sm mb-5">
+                  {searchQuery.trim()
+                    ? 'Try a different search or clear the search box.'
+                    : viewMode === 'mine' && qualityFilter === 'All'
+                      ? 'Create your first image with a prompt — or explore the community for inspiration.'
+                      : viewMode === 'all'
+                        ? 'Be the first to share something with the community!'
+                        : `Try "All" or generate images at ${qualityFilter}.`}
                 </p>
-                <p className="text-sm mt-2">
-                  {viewMode === 'mine' && qualityFilter === 'All'
-                    ? 'Enter a prompt below to generate your first image'
-                    : viewMode === 'all'
-                      ? 'Be the first to share something!'
-                      : `Try selecting "All" or generate images at ${qualityFilter}`}
-                </p>
+                {noImagesYet && noCredits && (
+                  <p className="text-white/45 text-xs mb-4">You're out of credits. Get more to start creating.</p>
+                )}
+                {noImagesYet && (
+                  <button
+                    type="button"
+                    onClick={() => setControlPanelOpen(true)}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold text-sm hover:opacity-95 transition-opacity"
+                  >
+                    Start Kreating
+                  </button>
+                )}
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="text-white/60 text-sm hover:text-white underline"
+                  >
+                    Clear search
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -701,6 +877,8 @@ function AppShell() {
             onReusePrompt={(promptText, refUrls) => {
               handleReRun(promptText, refUrls);
             }}
+            imageId={viewMode === 'mine' ? item.id : undefined}
+            onDelete={viewMode === 'mine' ? handleDeleteImage : undefined}
             onPrev={onPrev}
             onNext={onNext}
             hasPrev={hasPrev}

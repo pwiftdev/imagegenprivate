@@ -9,6 +9,8 @@ interface ImageModalProps {
   referenceImageUrls?: string[];
   onClose: () => void;
   onReusePrompt?: (prompt: string, referenceImageUrls?: string[]) => void;
+  onDelete?: (imageId: string) => void | Promise<void>;
+  imageId?: string;
   onPrev?: () => void;
   onNext?: () => void;
   hasPrev?: boolean;
@@ -28,12 +30,15 @@ const ImageModal: React.FC<ImageModalProps> = ({
   referenceImageUrls,
   onClose,
   onReusePrompt,
+  onDelete,
+  imageId,
   onPrev,
   onNext,
   hasPrev = false,
   hasNext = false,
 }) => {
   const [zoom, setZoom] = useState(1);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -186,6 +191,18 @@ const ImageModal: React.FC<ImageModalProps> = ({
       onClose();
     }
   }, [prompt, referenceImageUrls, onReusePrompt, onClose]);
+
+  const handleDelete = useCallback(async () => {
+    if (!imageId || !onDelete) return;
+    if (!window.confirm('Delete this image? This cannot be undone.')) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(imageId);
+      onClose();
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [imageId, onDelete, onClose]);
 
   const isShareSupported =
     typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -457,6 +474,24 @@ const ImageModal: React.FC<ImageModalProps> = ({
                   />
                 </svg>
                 Reuse prompt
+              </button>
+            )}
+            {imageId && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="w-full flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                aria-label="Delete image"
+              >
+                {isDeleting ? (
+                  <span className="animate-spin inline-block w-4 h-4 border-2 border-red-300/50 border-t-red-300 rounded-full" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4m1 4h.01M12 4h.01M17 21h-10" />
+                  </svg>
+                )}
+                {isDeleting ? 'Deleting…' : 'Delete'}
               </button>
             )}
           </div>

@@ -82,7 +82,8 @@ export async function saveImageToSupabase(
   prompt: string,
   aspectRatio: string,
   imageSize: string,
-  referenceImageUrls?: string[]
+  referenceImageUrls?: string[],
+  folderId?: string | null
 ): Promise<StoredImage> {
   if (!supabase) {
     throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env');
@@ -131,6 +132,7 @@ export async function saveImageToSupabase(
   if (referenceImageUrls && referenceImageUrls.length > 0) {
     insertPayload.reference_image_urls = referenceImageUrls;
   }
+  if (folderId !== undefined) insertPayload.folder_id = folderId ?? null;
 
   // Insert metadata
   const { data: row, error: dbError } = await supabase
@@ -160,7 +162,8 @@ export async function saveImageMetadataToSupabase(
   aspectRatio: string,
   imageSize: string,
   referenceImageUrls?: string[],
-  thumbStoragePath?: string | null
+  thumbStoragePath?: string | null,
+  folderId?: string | null
 ): Promise<StoredImage> {
   if (!supabase) {
     throw new Error('Supabase is not configured');
@@ -185,6 +188,7 @@ export async function saveImageMetadataToSupabase(
   if (referenceImageUrls && referenceImageUrls.length > 0) {
     insertPayload.reference_image_urls = referenceImageUrls;
   }
+  if (folderId !== undefined) insertPayload.folder_id = folderId ?? null;
 
   const { data: row, error: dbError } = await supabase
     .from('images')
@@ -205,6 +209,8 @@ export async function saveImageMetadataToSupabase(
 
 export type ImageScope = 'mine' | 'all';
 
+export type FolderIdFilter = string | null;
+
 const DEFAULT_PAGE_SIZE = 12;
 
 export interface FetchImagesResult {
@@ -214,11 +220,12 @@ export interface FetchImagesResult {
 
 /**
  * Fetch images from Supabase (newest first), paginated to reduce egress.
- * scope: 'mine' = only current user's images, 'all' = everyone's images
+ * scope: 'mine' = only current user's images, 'all' = everyone's images.
+ * When scope is 'mine', options.folderId filters by folder: null = "My Kreations" (folder_id IS NULL), string = that folder.
  */
 export async function fetchImagesFromSupabase(
   scope: ImageScope = 'mine',
-  options?: { limit?: number; offset?: number }
+  options?: { limit?: number; offset?: number; folderId?: FolderIdFilter }
 ): Promise<FetchImagesResult> {
   if (!supabase) {
     return { images: [], hasMore: false };
@@ -246,6 +253,13 @@ export async function fetchImagesFromSupabase(
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (userId) query = query.eq('user_id', userId);
+  if (scope === 'mine' && options?.folderId !== undefined) {
+    if (options.folderId === null) {
+      query = query.is('folder_id', null);
+    } else {
+      query = query.eq('folder_id', options.folderId);
+    }
+  }
   const result1 = await query;
   if (!result1.error) {
     rows = (result1.data ?? null) as Record<string, unknown>[] | null;
@@ -257,6 +271,10 @@ export async function fetchImagesFromSupabase(
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     if (userId) query2 = query2.eq('user_id', userId);
+    if (scope === 'mine' && options?.folderId !== undefined) {
+      if (options.folderId === null) query2 = query2.is('folder_id', null);
+      else query2 = query2.eq('folder_id', options.folderId);
+    }
     const result2 = await query2;
     rows = (result2.data ?? null) as Record<string, unknown>[] | null;
     error = result2.error as Error | null;
@@ -292,6 +310,38 @@ export async function fetchImagesFromSupabase(
   const hasMore = rows.length === limit;
 
   return { images, hasMore };
+}
+
+/**
+ * Delete an image: remove from storage (full + thumb) and delete row.
+ * Caller should ensure the image belongs to the current user (e.g. only in "mine" view).
+ */
+export async function deleteImage(imageId: string): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from('images')
+    .select('storage_path, thumb_storage_path')
+    .eq('id', imageId)
+    .single();
+
+  if (fetchError || !row) {
+    throw new Error(fetchError?.message ?? 'Image not found');
+  }
+
+  const pathsToRemove: string[] = [row.storage_path];
+  if (row.thumb_storage_path && row.thumb_storage_path !== row.storage_path) {
+    pathsToRemove.push(row.thumb_storage_path);
+  }
+
+  await supabase.storage.from(BUCKET_NAME).remove(pathsToRemove);
+
+  const { error: deleteError } = await supabase.from('images').delete().eq('id', imageId);
+  if (deleteError) {
+    throw new Error(`Failed to delete image: ${deleteError.message}`);
+  }
 }
 
 const SHOWCASE_THUMB_LIMIT = 36;
