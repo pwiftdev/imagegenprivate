@@ -466,7 +466,7 @@ function AppShell() {
   }, [queue, runningCount, processQueue]);
 
   const WRAP_PROMPT =
-    'The refence image includes red rectangle selectors with text that explain what exactly needs to be changed on the image. Execute this prompt.';
+    'The refence image includes red rectangle selectors with text that explain what exactly needs to be changed on the image. Execute this prompt. Never output back the red rectangles and the red text. Only the image with the changes made.';
 
   const handleGenerate = useCallback((params: ImageGenerationParams, batchSize: number) => {
     if (!params.prompt.trim()) {
