@@ -192,6 +192,7 @@ function AppShell() {
   const [wrapAspect, setWrapAspect] = useState<ImageGenerationParams['aspectRatio']>('3:2');
   const [wrapQuality, setWrapQuality] = useState<ImageGenerationParams['imageSize']>('1K');
   const [wrapModel, setWrapModel] = useState<ImageModelId>('gemini-3-pro-image-preview');
+  const [wrapBatchSize, setWrapBatchSize] = useState(1);
   const [wrapGenerating, setWrapGenerating] = useState(false);
 
   useEffect(() => {
@@ -831,6 +832,37 @@ function AppShell() {
                   ))}
                 </div>
               </div>
+
+              <div>
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1.5">
+                  Batch size
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWrapBatchSize((n) => Math.max(1, n - 1))}
+                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={wrapBatchSize <= 1}
+                    aria-label="Decrease batch size"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </button>
+                  <span className="text-white text-sm min-w-[3ch] text-center">{wrapBatchSize}</span>
+                  <button
+                    type="button"
+                    onClick={() => setWrapBatchSize((n) => Math.min(8, n + 1))}
+                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={wrapBatchSize >= 8}
+                    aria-label="Increase batch size"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end mt-6">
@@ -865,7 +897,7 @@ function AppShell() {
                     if (extraRefs.length > 0) {
                       params.referenceImageUrls = extraRefs;
                     }
-                    handleGenerate(params, 1);
+                    handleGenerate(params, wrapBatchSize);
                     setWrapSettings(null);
                   } catch (err) {
                     console.error('Wrap generate failed:', err);
@@ -873,13 +905,14 @@ function AppShell() {
                     setWrapGenerating(false);
                   }
                 }}
-                disabled={wrapGenerating}
+                disabled={wrapGenerating || (typeof credits === 'number' && credits < wrapBatchSize)}
+                title={typeof credits === 'number' && credits < wrapBatchSize ? 'Not enough credits' : undefined}
                 className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {wrapGenerating && (
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 )}
-                {wrapGenerating ? 'Starting…' : 'Start generation'}
+                {wrapGenerating ? 'Starting…' : `Start generation${wrapBatchSize > 1 ? ` (${wrapBatchSize})` : ''}`}
               </button>
             </div>
           </div>
