@@ -651,21 +651,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   );
                   if (filtered.length === 0) return null;
                   return (
-                    <div className="absolute left-4 right-4 top-full z-50 mt-1 max-h-48 overflow-auto rounded-xl border border-white/15 bg-[#16181c] shadow-xl py-1">
+                    <div className="absolute left-0 right-0 bottom-full z-50 mb-1 max-h-40 min-w-[140px] overflow-auto rounded-lg border border-white/10 bg-[#0d0e10]/95 shadow-lg py-0.5">
                       {filtered.map((t) => (
                         <button
                           key={t.id}
                           type="button"
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-white/10 focus:bg-white/10 focus:outline-none flex flex-col gap-0.5"
+                          className="w-full px-3 py-1.5 text-left text-xs font-mono text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:outline-none focus:text-white"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             insertPromptTemplate(t);
                           }}
                         >
-                          <span className="font-mono text-blue-300">@{t.handle}</span>
-                          {t.prompt_text && (
-                            <span className="text-white/60 text-xs truncate">{t.prompt_text}</span>
-                          )}
+                          @{t.handle}
                         </button>
                       ))}
                     </div>

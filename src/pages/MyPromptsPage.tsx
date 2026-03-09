@@ -119,7 +119,7 @@ const MyPromptsPage: React.FC<MyPromptsPageProps> = ({ user }) => {
             <h1 className="landing-font-display text-3xl font-bold text-white tracking-tight">
               My <span className="dashboard-title-gradient">Prompts</span>
             </h1>
-            <p className="text-white/55 text-base mt-1">
+            <p className="text-white/55 text-base mt-1 max-w-md">
               Save prompts with handles and use <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/80">@handle</kbd> in the control panel to insert them
             </p>
           </div>
