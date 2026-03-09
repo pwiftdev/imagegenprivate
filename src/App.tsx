@@ -38,6 +38,23 @@ function nextJobId() {
   return `job-${++jobIdCounter}`;
 }
 
+const WRAP_ASPECTS: ImageGenerationParams['aspectRatio'][] = [
+  '1:1',
+  '3:2',
+  '4:3',
+  '16:9',
+  '9:16',
+  '2:3',
+  '3:4',
+  '21:9',
+  '5:4',
+  '4:5',
+];
+
+const WRAP_QUALITIES: ImageGenerationParams['imageSize'][] = ['1K', '2K', '4K'];
+
+const WRAP_MODELS = Object.keys(IMAGE_MODELS) as ImageModelId[];
+
 interface ResetPasswordScreenProps {
   onSubmit: (password: string) => Promise<void>;
 }
@@ -168,6 +185,14 @@ function AppShell() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const imageCountRef = useRef(0);
+  const [wrapSettings, setWrapSettings] = useState<{
+    wrappedUrl: string;
+    referenceImageUrls?: string[];
+  } | null>(null);
+  const [wrapAspect, setWrapAspect] = useState<ImageGenerationParams['aspectRatio']>('3:2');
+  const [wrapQuality, setWrapQuality] = useState<ImageGenerationParams['imageSize']>('1K');
+  const [wrapModel, setWrapModel] = useState<ImageModelId>('gemini-3-pro-image-preview');
+  const [wrapGenerating, setWrapGenerating] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
@@ -726,6 +751,141 @@ function AppShell() {
         </div>
       )}
 
+      {/* Wrap & regenerate settings modal */}
+      {wrapSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => !wrapGenerating && setWrapSettings(null)}>
+          <div
+            className="bg-[#0d0e10] border border-white/10 rounded-2xl shadow-xl p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="landing-font-display text-lg font-semibold text-white mb-2">
+              Wrap settings
+            </h3>
+            <p className="text-white/55 text-sm mb-4">
+              Choose aspect ratio, quality, and model for this wrapped regeneration.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1.5">
+                  Aspect ratio
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {WRAP_ASPECTS.map((ratio) => (
+                    <button
+                      key={ratio}
+                      type="button"
+                      onClick={() => setWrapAspect(ratio)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        wrapAspect === ratio
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {ratio}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1.5">
+                  Quality
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {WRAP_QUALITIES.map((quality) => (
+                    <button
+                      key={quality}
+                      type="button"
+                      onClick={() => setWrapQuality(quality)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        wrapQuality === quality
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {quality}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1.5">
+                  Model
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {WRAP_MODELS.map((modelId) => (
+                    <button
+                      key={modelId}
+                      type="button"
+                      onClick={() => setWrapModel(modelId)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        wrapModel === modelId
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {IMAGE_MODELS[modelId]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end mt-6">
+              <button
+                type="button"
+                onClick={() => !wrapGenerating && setWrapSettings(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white/80 hover:text-white bg-white/10"
+                disabled={wrapGenerating}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!wrapSettings || wrapGenerating) return;
+                  setWrapGenerating(true);
+                  try {
+                    const base64 = await compressImageFromUrl(wrapSettings.wrappedUrl);
+                    const params: ImageGenerationParams = {
+                      prompt: WRAP_PROMPT,
+                      aspectRatio: wrapAspect,
+                      imageSize: wrapQuality,
+                      model: wrapModel,
+                      referenceImages: [base64],
+                    };
+                    const extraRefs =
+                      wrapSettings.referenceImageUrls?.filter(
+                        (u): u is string =>
+                          typeof u === 'string' &&
+                          (u.startsWith('http://') || u.startsWith('https://'))
+                      ) ?? [];
+                    if (extraRefs.length > 0) {
+                      params.referenceImageUrls = extraRefs;
+                    }
+                    handleGenerate(params, 1);
+                    setWrapSettings(null);
+                  } catch (err) {
+                    console.error('Wrap generate failed:', err);
+                  } finally {
+                    setWrapGenerating(false);
+                  }
+                }}
+                disabled={wrapGenerating}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {wrapGenerating && (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                )}
+                {wrapGenerating ? 'Starting…' : 'Start generation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create folder modal */}
       {createFolderOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => !createFolderSubmitting && setCreateFolderOpen(false)}>
@@ -965,32 +1125,16 @@ function AppShell() {
           if (idx >= 0) setSelectedImageIndex(idx);
         };
         const handleWrapGenerate = (wrappedUrl: string, referenceImageUrlsFromModal?: string[]) => {
-          void (async () => {
-            try {
-              const aspect = (item.aspectRatio as ImageGenerationParams['aspectRatio']) || '3:2';
-              const size = (item.imageSize as ImageGenerationParams['imageSize']) || '1K';
-              const base64 = await compressImageFromUrl(wrappedUrl);
-              const params: ImageGenerationParams = {
-                prompt: WRAP_PROMPT,
-                aspectRatio: aspect,
-                imageSize: size,
-                model: (item.model as ImageModelId | undefined) ?? 'gemini-3-pro-image-preview',
-                referenceImages: [base64],
-              };
-              const extraRefs =
-                referenceImageUrlsFromModal?.filter(
-                  (u): u is string =>
-                    typeof u === 'string' &&
-                    (u.startsWith('http://') || u.startsWith('https://'))
-                ) ?? [];
-              if (extraRefs.length > 0) {
-                params.referenceImageUrls = extraRefs;
-              }
-              handleGenerate(params, 1);
-            } catch (err) {
-              console.error('Wrap generate failed:', err);
-            }
-          })();
+          const aspect = (item.aspectRatio as ImageGenerationParams['aspectRatio']) || '3:2';
+          const size = (item.imageSize as ImageGenerationParams['imageSize']) || '1K';
+          const model = (item.model as ImageModelId | undefined) ?? 'gemini-3-pro-image-preview';
+          setWrapSettings({
+            wrappedUrl,
+            referenceImageUrls: referenceImageUrlsFromModal ?? item.referenceImageUrls,
+          });
+          setWrapAspect(aspect);
+          setWrapQuality(size);
+          setWrapModel(model);
         };
         return (
           <ImageModal
