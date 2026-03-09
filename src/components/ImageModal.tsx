@@ -22,6 +22,40 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
 
+const FONT_FAMILY = 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+
+/**
+ * Compute text position so the label stays fully inside image bounds.
+ * Returns { x, y, maxWidth } for ctx.fillText (y is baseline). Uses measureText for width.
+ * maxWidth ensures long text is clipped to the right edge.
+ */
+function getTextPositionInsideBounds(
+  ctx: CanvasRenderingContext2D,
+  _text: string,
+  fontSize: number,
+  bounds: { left: number; top: number; width: number; height: number },
+  rect: { x: number; y: number; width: number; height: number }
+): { x: number; y: number; maxWidth: number } {
+  ctx.font = `${fontSize}px ${FONT_FAMILY}`;
+  const padding = 4;
+  const lineHeight = fontSize * 1.2;
+  const boundsRight = bounds.left + bounds.width;
+  const boundsBottom = bounds.top + bounds.height;
+
+  // Prefer above rect; if that would go above image top, put below rect
+  let textY = rect.y - 4;
+  if (textY - lineHeight < bounds.top) {
+    textY = rect.y + rect.height + lineHeight - 4;
+  }
+  textY = Math.max(bounds.top + lineHeight, Math.min(boundsBottom - 2, textY));
+
+  let textX = rect.x + padding;
+  textX = Math.max(bounds.left, Math.min(boundsRight - padding, textX));
+  const maxWidth = Math.max(0, boundsRight - textX - padding);
+
+  return { x: textX, y: textY, maxWidth };
+}
+
 /** Must match ControlPanel MOODBOARD_PROMPT_PREFIX - used to detect moodboard-generated images */
 const MOODBOARD_PROMPT_PREFIX = 'First reference photo is the main reference. All other reference images are moodboard, to help you reach the final output for the prompt. ';
 
@@ -163,9 +197,11 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
     ctx.strokeStyle = '#ff4d4f';
     ctx.lineWidth = 2;
-    ctx.font = '14px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+    const displayFontSize = 14;
+    ctx.font = `${displayFontSize}px ${FONT_FAMILY}`;
     ctx.fillStyle = '#ff4d4f';
 
+    const bounds = { left: offsetX, top: offsetY, width: drawWidth, height: drawHeight };
     const drawOne = (ann: Annotation) => {
       const x = offsetX + ann.x * scale;
       const y = offsetY + ann.y * scale;
@@ -174,8 +210,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
       if (w <= 0 || h <= 0) return;
       ctx.strokeRect(x, y, w, h);
       if (ann.text) {
-        const textY = y - 6 < 12 ? y + 16 : y - 6;
-        ctx.fillText(ann.text, x + 4, textY);
+        const pos = getTextPositionInsideBounds(ctx, ann.text, displayFontSize, bounds, { x, y, width: w, height: h });
+        ctx.fillText(ann.text, pos.x, pos.y, pos.maxWidth);
       }
     };
 
@@ -476,14 +512,16 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
       ctx.strokeStyle = '#ff4d4f';
       ctx.lineWidth = Math.max(2, Math.round(info.naturalWidth / 400));
-      ctx.font = `${Math.max(16, Math.round(info.naturalWidth / 40))}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`;
+      const exportFontSize = Math.max(16, Math.round(info.naturalWidth / 40));
+      ctx.font = `${exportFontSize}px ${FONT_FAMILY}`;
       ctx.fillStyle = '#ff4d4f';
 
+      const imageBounds = { left: 0, top: 0, width: info.naturalWidth, height: info.naturalHeight };
       for (const ann of annotationsRef.current) {
         ctx.strokeRect(ann.x, ann.y, ann.width, ann.height);
         if (ann.text) {
-          const textY = ann.y - 8 < 16 ? ann.y + 20 : ann.y - 8;
-          ctx.fillText(ann.text, ann.x + 4, textY);
+          const pos = getTextPositionInsideBounds(ctx, ann.text, exportFontSize, imageBounds, ann);
+          ctx.fillText(ann.text, pos.x, pos.y, pos.maxWidth);
         }
       }
 
