@@ -19,6 +19,8 @@ import { IMAGE_MODELS } from './services/imageGeneration';
 import { compressImageFromUrl } from './utils/compressImage';
 import LandingPage from './pages/LandingPage';
 import MoodboardsPage from './pages/MoodboardsPage';
+import MyPromptsPage from './pages/MyPromptsPage';
+import { fetchPromptTemplates, DEFAULT_PROMPT_TEMPLATES } from './services/promptTemplateService';
 import './App.css';
 
 // App shell: grid, control panel, modals (wrap settings, image modal, etc.)
@@ -174,6 +176,7 @@ function AppShell() {
   const [moodboardUrlsToInject, setMoodboardUrlsToInject] = useState<string[] | null>(null);
   const [controlPanelOpen, setControlPanelOpen] = useState(false);
   const [moodboards, setMoodboards] = useState<Moodboard[]>([]);
+  const [promptTemplates, setPromptTemplates] = useState<Array<{ id: string; handle: string; prompt_text: string }>>([]);
   const [currentUserCreator, setCurrentUserCreator] = useState<CreatorInfo | null>(null);
   const [imagesRefreshKey, setImagesRefreshKey] = useState(0);
   const [hasMoreImages, setHasMoreImages] = useState(false);
@@ -244,6 +247,17 @@ function AppShell() {
       .catch((err) => {
         console.error('Failed to load moodboards:', err);
         setMoodboards([]);
+      });
+  }, [user?.id]);
+
+  // Load prompt templates when user is set
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchPromptTemplates(user.id)
+      .then(setPromptTemplates)
+      .catch((err) => {
+        console.error('Failed to load prompt templates:', err);
+        setPromptTemplates([]);
       });
   }, [user?.id]);
 
@@ -635,7 +649,7 @@ function AppShell() {
 
   return (
     <>
-      {pathname !== '/app/profile' && pathname !== '/app/moodboards' && <Header onSignOut={signOut} credits={credits} />}
+      {pathname !== '/app/profile' && pathname !== '/app/moodboards' && pathname !== '/app/prompts' && <Header onSignOut={signOut} credits={credits} />}
       {pathname === '/app/profile' ? (
         <ProfilePage user={user} credits={credits} onSignOut={signOut} onRequestPasswordReset={user?.email ? async () => { await resetPassword(user.email!); } : undefined} />
       ) : pathname === '/app/moodboards' ? (
@@ -647,6 +661,8 @@ function AppShell() {
             setControlPanelOpen(true);
           }}
         />
+      ) : pathname === '/app/prompts' ? (
+        <MyPromptsPage user={user} onSignOut={signOut} />
       ) : (
     <div className="min-h-screen bg-[#08090a] pb-32 pt-16 landing-font-body relative">
       {/* Background – same vibe as landing (orbs + gradient + noise) */}
@@ -1020,6 +1036,15 @@ function AppShell() {
                 </svg>
                 My Moodboards
               </Link>
+              <Link
+                to="/app/prompts"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white/80 hover:text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                My Prompts
+              </Link>
             </div>
           </div>
         </div>
@@ -1122,6 +1147,7 @@ function AppShell() {
             referenceImageUrlsToInject={referenceImageUrlsToInject}
             onReferenceImagesInjected={handleReferenceImagesInjected}
             moodboards={moodboards}
+            promptTemplates={[...DEFAULT_PROMPT_TEMPLATES, ...promptTemplates]}
             onRequestMoodboardInjection={(urls) => setMoodboardUrlsToInject(urls)}
             moodboardUrlsToInject={moodboardUrlsToInject}
             onMoodboardInjected={handleMoodboardInjected}
@@ -1199,6 +1225,7 @@ function App() {
       <Route path="/app" element={<AppShell />} />
       <Route path="/app/profile" element={<AppShell />} />
       <Route path="/app/moodboards" element={<AppShell />} />
+      <Route path="/app/prompts" element={<AppShell />} />
     </Routes>
   );
 }

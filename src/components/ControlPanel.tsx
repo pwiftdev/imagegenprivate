@@ -24,6 +24,7 @@ interface ControlPanelProps {
   onRequestMoodboardInjection?: (urls: string[]) => void;
   moodboardUrlsToInject?: string[] | null;
   onMoodboardInjected?: () => void;
+  promptTemplates?: Array<{ id: string; handle: string; prompt_text: string }>;
   onCloseMobile?: () => void;
   className?: string;
 }
@@ -49,6 +50,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onRequestMoodboardInjection,
   moodboardUrlsToInject,
   onMoodboardInjected,
+  promptTemplates = [],
   onCloseMobile,
   className,
 }) => {
@@ -65,8 +67,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [enlargedRefUrl, setEnlargedRefUrl] = useState<string | null>(null);
   const [useMoodboardModalOpen, setUseMoodboardModalOpen] = useState(false);
   const [moodboardInUse, setMoodboardInUse] = useState(false);
-  
+  const [atMention, setAtMention] = useState<{ atIndex: number; filter: string; cursorPos: number } | null>(null);
+
   const objectUrlsRef = useRef<string[]>([]);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
 
   const MOODBOARD_PROMPT_PREFIX = 'First reference photo is the main reference. All other reference images are moodboard, to help you reach the final output for the prompt. ';
 
@@ -76,11 +80,55 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         setEnlargedRefUrl(null);
         setOpenPicker(null);
         setUseMoodboardModalOpen(false);
+        setAtMention(null);
       }
     };
     window.addEventListener('keydown', onEscape);
     return () => window.removeEventListener('keydown', onEscape);
   }, []);
+
+  const handlePromptChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      const cursorPos = e.target.selectionStart ?? value.length;
+      setPrompt(value);
+      setEnhanceError(null);
+
+      if (promptTemplates.length === 0) {
+        setAtMention(null);
+        return;
+      }
+      const textBefore = value.slice(0, cursorPos);
+      const lastAt = textBefore.lastIndexOf('@');
+      if (lastAt === -1) {
+        setAtMention(null);
+        return;
+      }
+      const afterAt = textBefore.slice(lastAt + 1);
+      if (/\s/.test(afterAt)) {
+        setAtMention(null);
+        return;
+      }
+      setAtMention({ atIndex: lastAt, filter: afterAt, cursorPos });
+    },
+    [promptTemplates.length]
+  );
+
+  const insertPromptTemplate = useCallback(
+    (template: { handle: string; prompt_text: string }) => {
+      if (!atMention) return;
+      const before = prompt.slice(0, atMention.atIndex);
+      const after = prompt.slice(atMention.cursorPos);
+      setPrompt(before + template.prompt_text + after);
+      setAtMention(null);
+      setTimeout(() => {
+        const newPos = atMention.atIndex + template.prompt_text.length;
+        promptRef.current?.focus();
+        promptRef.current?.setSelectionRange(newPos, newPos);
+      }, 0);
+    },
+    [atMention, prompt]
+  );
 
   useEffect(() => {
     if (promptToInject?.trim()) {
@@ -588,13 +636,41 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="mb-4">
               <div className="relative">
                 <textarea
+                  ref={promptRef}
                   value={prompt}
-                  onChange={(e) => { setPrompt(e.target.value); setEnhanceError(null); }}
-                  placeholder="Enter your prompt here..."
+                  onChange={handlePromptChange}
+                  onBlur={() => setTimeout(() => setAtMention(null), 150)}
+                  placeholder="Enter your prompt here... Type @ to insert a saved prompt"
                   spellCheck
                   lang="en"
                   className={`w-full bg-[#16181c]/80 border border-white/15 rounded-xl p-4 ${SHOW_KREATE_PLUS ? 'pr-28' : 'pr-4'} text-white placeholder-white/50 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 min-h-[100px] text-sm transition-all`}
                 />
+                {atMention != null && promptTemplates.length > 0 && (() => {
+                  const filtered = promptTemplates.filter((t) =>
+                    t.handle.toLowerCase().startsWith(atMention!.filter.toLowerCase())
+                  );
+                  if (filtered.length === 0) return null;
+                  return (
+                    <div className="absolute left-4 right-4 top-full z-50 mt-1 max-h-48 overflow-auto rounded-xl border border-white/15 bg-[#16181c] shadow-xl py-1">
+                      {filtered.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-white/10 focus:bg-white/10 focus:outline-none flex flex-col gap-0.5"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            insertPromptTemplate(t);
+                          }}
+                        >
+                          <span className="font-mono text-blue-300">@{t.handle}</span>
+                          {t.prompt_text && (
+                            <span className="text-white/60 text-xs truncate">{t.prompt_text}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
                 {SHOW_KREATE_PLUS && (
                   <button
                     type="button"
