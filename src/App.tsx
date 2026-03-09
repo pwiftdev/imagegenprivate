@@ -14,8 +14,9 @@ import { fetchFolders, createFolder, type Folder } from './services/folderServic
 import { fetchMoodboards, type Moodboard } from './services/moodboardService';
 import { submitFeedback } from './services/feedbackService';
 import { recordGeneration } from './services/stats';
-import type { ImageGenerationParams } from './services/imageGeneration';
+import type { ImageGenerationParams, ImageModelId } from './services/imageGeneration';
 import { IMAGE_MODELS } from './services/imageGeneration';
+import { compressImageFromUrl } from './utils/compressImage';
 import LandingPage from './pages/LandingPage';
 import MoodboardsPage from './pages/MoodboardsPage';
 import './App.css';
@@ -439,6 +440,9 @@ function AppShell() {
     processQueue();
   }, [queue, runningCount, processQueue]);
 
+  const WRAP_PROMPT =
+    'The refence image includes red rectangle selectors with text that explain what exactly needs to be changed on the image. Execute this prompt.';
+
   const handleGenerate = useCallback((params: ImageGenerationParams, batchSize: number) => {
     if (!params.prompt.trim()) {
       setError('Please enter a prompt');
@@ -532,7 +536,15 @@ function AppShell() {
   const handleReRun = useCallback((prompt: string, referenceImageUrls?: string[]) => {
     setPromptToInject(prompt);
     if (referenceImageUrls && referenceImageUrls.length > 0) {
-      const valid = referenceImageUrls.filter((u): u is string => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://')));
+      const isValidUrl = (u: unknown): u is string => {
+        if (typeof u !== 'string') return false;
+        return (
+          u.startsWith('http://') ||
+          u.startsWith('https://') ||
+          u.startsWith('blob:')
+        );
+      };
+      const valid = referenceImageUrls.filter(isValidUrl);
       const deduped = [...new Set(valid)];
       setReferenceImageUrlsToInject(deduped.length ? deduped : null);
     } else {
@@ -952,6 +964,34 @@ function AppShell() {
           const idx = filteredGridItems.findIndex((i) => i.type === 'image' && i.id === nextItem.id);
           if (idx >= 0) setSelectedImageIndex(idx);
         };
+        const handleWrapGenerate = (wrappedUrl: string, referenceImageUrlsFromModal?: string[]) => {
+          void (async () => {
+            try {
+              const aspect = (item.aspectRatio as ImageGenerationParams['aspectRatio']) || '3:2';
+              const size = (item.imageSize as ImageGenerationParams['imageSize']) || '1K';
+              const base64 = await compressImageFromUrl(wrappedUrl);
+              const params: ImageGenerationParams = {
+                prompt: WRAP_PROMPT,
+                aspectRatio: aspect,
+                imageSize: size,
+                model: (item.model as ImageModelId | undefined) ?? 'gemini-3-pro-image-preview',
+                referenceImages: [base64],
+              };
+              const extraRefs =
+                referenceImageUrlsFromModal?.filter(
+                  (u): u is string =>
+                    typeof u === 'string' &&
+                    (u.startsWith('http://') || u.startsWith('https://'))
+                ) ?? [];
+              if (extraRefs.length > 0) {
+                params.referenceImageUrls = extraRefs;
+              }
+              handleGenerate(params, 1);
+            } catch (err) {
+              console.error('Wrap generate failed:', err);
+            }
+          })();
+        };
         return (
           <ImageModal
             imageUrl={item.url}
@@ -964,6 +1004,7 @@ function AppShell() {
             onReusePrompt={(promptText, refUrls) => {
               handleReRun(promptText, refUrls);
             }}
+            onWrapGenerate={handleWrapGenerate}
             imageId={item.id}
             onDelete={handleDeleteImage}
             onPrev={onPrev}

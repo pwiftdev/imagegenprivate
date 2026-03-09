@@ -9,6 +9,7 @@ interface ImageModalProps {
   referenceImageUrls?: string[];
   onClose: () => void;
   onReusePrompt?: (prompt: string, referenceImageUrls?: string[]) => void;
+  onWrapGenerate?: (wrappedUrl: string, referenceImageUrls?: string[]) => void;
   onDelete?: (imageId: string) => void | Promise<void>;
   imageId?: string;
   onPrev?: () => void;
@@ -33,6 +34,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
   referenceImageUrls,
   onClose,
   onReusePrompt,
+  onWrapGenerate,
   onDelete,
   imageId,
   onPrev,
@@ -46,6 +48,42 @@ const ImageModal: React.FC<ImageModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const annotationCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const imageElementRef = useRef<HTMLImageElement | null>(null);
+
+  type Annotation = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    text?: string;
+  };
+
+  const [isAnnotating, setIsAnnotating] = useState(false);
+  const [hasAnnotations, setHasAnnotations] = useState(false);
+  const [annotationsState, setAnnotationsState] = useState<Annotation[]>([]);
+  const annotationsRef = useRef<Annotation[]>([]);
+  const drawingRef = useRef<{
+    isDrawing: boolean;
+    startX: number;
+    startY: number;
+    current?: Annotation;
+  }>({
+    isDrawing: false,
+    startX: 0,
+    startY: 0,
+    current: undefined,
+  });
+  const imageInfoRef = useRef<{
+    naturalWidth: number;
+    naturalHeight: number;
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+    drawWidth: number;
+    drawHeight: number;
+  } | null>(null);
+  const fetchedImageRef = useRef<HTMLImageElement | null>(null);
 
   const usedMoodboard = Boolean(prompt?.startsWith(MOODBOARD_PROMPT_PREFIX));
   const displayPrompt = usedMoodboard && prompt ? prompt.slice(MOODBOARD_PROMPT_PREFIX.length).trim() : prompt;
@@ -98,6 +136,223 @@ const ImageModal: React.FC<ImageModalProps> = ({
     setIsDragging(false);
   }, []);
 
+  const drawAnnotations = useCallback(() => {
+    const canvas = annotationCanvasRef.current;
+    const info = imageInfoRef.current;
+    const img = fetchedImageRef.current;
+    if (!canvas || !info || !img) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = canvas.clientWidth || canvas.width / dpr;
+    const displayHeight = canvas.clientHeight || canvas.height / dpr;
+    canvas.width = displayWidth * dpr;
+    canvas.height = displayHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(0, 0, displayWidth, displayHeight);
+
+    const { offsetX, offsetY, drawWidth, drawHeight, scale } = info;
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+    const annotations = annotationsRef.current;
+    const current = drawingRef.current.current;
+
+    ctx.strokeStyle = '#ff4d4f';
+    ctx.lineWidth = 2;
+    ctx.font = '14px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#ff4d4f';
+
+    const drawOne = (ann: Annotation) => {
+      const x = offsetX + ann.x * scale;
+      const y = offsetY + ann.y * scale;
+      const w = ann.width * scale;
+      const h = ann.height * scale;
+      if (w <= 0 || h <= 0) return;
+      ctx.strokeRect(x, y, w, h);
+      if (ann.text) {
+        const textY = y - 6 < 12 ? y + 16 : y - 6;
+        ctx.fillText(ann.text, x + 4, textY);
+      }
+    };
+
+    annotations.forEach(drawOne);
+    if (drawingRef.current.isDrawing && current) {
+      drawOne(current);
+    }
+  }, []);
+
+  const setupAnnotationCanvas = useCallback(async () => {
+    if (!containerRef.current || !annotationCanvasRef.current) return;
+    const canvas = annotationCanvasRef.current;
+    const container = containerRef.current;
+
+    const rect = container.getBoundingClientRect();
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const naturalWidth = img.naturalWidth || img.width;
+        const naturalHeight = img.naturalHeight || img.height;
+        const dpr = window.devicePixelRatio || 1;
+        const displayWidth = rect.width;
+        const displayHeight = rect.height;
+        canvas.width = displayWidth * dpr;
+        canvas.height = displayHeight * dpr;
+        const scale = Math.min(displayWidth / naturalWidth, displayHeight / naturalHeight);
+        const drawWidth = naturalWidth * scale;
+        const drawHeight = naturalHeight * scale;
+        const offsetX = (displayWidth - drawWidth) / 2;
+        const offsetY = (displayHeight - drawHeight) / 2;
+        imageInfoRef.current = {
+          naturalWidth,
+          naturalHeight,
+          scale,
+          offsetX,
+          offsetY,
+          drawWidth,
+          drawHeight,
+        };
+        fetchedImageRef.current = img;
+        drawAnnotations();
+        URL.revokeObjectURL(objectUrl);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+      };
+      img.src = objectUrl;
+    } catch (err) {
+      console.error('Failed to prepare annotation canvas:', err);
+    }
+  }, [imageUrl, drawAnnotations]);
+
+  const handleCanvasMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!isAnnotating || !annotationCanvasRef.current || !imageInfoRef.current) return;
+      const canvas = annotationCanvasRef.current;
+      const info = imageInfoRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const withinImage =
+        px >= info.offsetX &&
+        px <= info.offsetX + info.drawWidth &&
+        py >= info.offsetY &&
+        py <= info.offsetY + info.drawHeight;
+      if (!withinImage) return;
+
+      const xInImage = (px - info.offsetX) / info.scale;
+      const yInImage = (py - info.offsetY) / info.scale;
+      drawingRef.current = {
+        isDrawing: true,
+        startX: xInImage,
+        startY: yInImage,
+        current: {
+          x: xInImage,
+          y: yInImage,
+          width: 0,
+          height: 0,
+        },
+      };
+      drawAnnotations();
+    },
+    [isAnnotating, drawAnnotations]
+  );
+
+  const handleCanvasMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!isAnnotating || !annotationCanvasRef.current || !imageInfoRef.current) return;
+      if (!drawingRef.current.isDrawing || !drawingRef.current.current) return;
+
+      const canvas = annotationCanvasRef.current;
+      const info = imageInfoRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+
+      const xInImage = (px - info.offsetX) / info.scale;
+      const yInImage = (py - info.offsetY) / info.scale;
+
+      const startX = drawingRef.current.startX;
+      const startY = drawingRef.current.startY;
+      const x = Math.min(startX, xInImage);
+      const y = Math.min(startY, yInImage);
+      const width = Math.abs(xInImage - startX);
+      const height = Math.abs(yInImage - startY);
+
+      drawingRef.current.current = {
+        x,
+        y,
+        width,
+        height,
+      };
+      drawAnnotations();
+    },
+    [isAnnotating, drawAnnotations]
+  );
+
+  const handleCanvasMouseUp = useCallback(() => {
+    if (!isAnnotating || !drawingRef.current.isDrawing || !drawingRef.current.current) {
+      drawingRef.current.isDrawing = false;
+      drawingRef.current.current = undefined;
+      return;
+    }
+    const finished = drawingRef.current.current;
+    drawingRef.current.isDrawing = false;
+    drawingRef.current.current = undefined;
+
+    if (finished.width <= 4 || finished.height <= 4) {
+      drawAnnotations();
+      return;
+    }
+
+    const ann: Annotation = {
+      ...finished,
+      text: undefined,
+    };
+    annotationsRef.current = [...annotationsRef.current, ann];
+    setAnnotationsState(annotationsRef.current);
+    setHasAnnotations(annotationsRef.current.length > 0);
+    drawAnnotations();
+  }, [isAnnotating, drawAnnotations]);
+
+  const handleToggleAnnotate = useCallback(() => {
+    setIsAnnotating((prev) => !prev);
+  }, []);
+
+  const handleClearAnnotations = useCallback(() => {
+    annotationsRef.current = [];
+    drawingRef.current = { isDrawing: false, startX: 0, startY: 0, current: undefined };
+    setAnnotationsState([]);
+    setHasAnnotations(false);
+    if (isAnnotating) {
+      drawAnnotations();
+    }
+  }, [isAnnotating, drawAnnotations]);
+
+  const handleAnnotationTextChange = useCallback(
+    (index: number, text: string) => {
+      const next = [...annotationsRef.current];
+      if (!next[index]) return;
+      next[index] = {
+        ...next[index],
+        text: text.trim() ? text : undefined,
+      };
+      annotationsRef.current = next;
+      setAnnotationsState(next);
+      drawAnnotations();
+    },
+    [drawAnnotations]
+  );
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -115,6 +370,11 @@ const ImageModal: React.FC<ImageModalProps> = ({
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, [imageUrl]);
+
+  useEffect(() => {
+    if (!isAnnotating) return;
+    void setupAnnotationCanvas();
+  }, [isAnnotating, setupAnnotationCanvas]);
 
   useEffect(() => {
     const handleKeydown = (e: KeyboardEvent) => {
@@ -191,6 +451,61 @@ const ImageModal: React.FC<ImageModalProps> = ({
     }
   }, [imageUrl, prompt]);
 
+  const handleWrapAndReuse = useCallback(async () => {
+    if (!onWrapGenerate) return;
+    if (!imageInfoRef.current || !fetchedImageRef.current || annotationsRef.current.length === 0) {
+      onWrapGenerate(imageUrl, referenceImageUrls);
+      onClose();
+      return;
+    }
+
+    try {
+      const info = imageInfoRef.current;
+      const img = fetchedImageRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = info.naturalWidth;
+      canvas.height = info.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        onWrapGenerate(imageUrl, referenceImageUrls);
+        onClose();
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, info.naturalWidth, info.naturalHeight);
+
+      ctx.strokeStyle = '#ff4d4f';
+      ctx.lineWidth = Math.max(2, Math.round(info.naturalWidth / 400));
+      ctx.font = `${Math.max(16, Math.round(info.naturalWidth / 40))}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = '#ff4d4f';
+
+      for (const ann of annotationsRef.current) {
+        ctx.strokeRect(ann.x, ann.y, ann.width, ann.height);
+        if (ann.text) {
+          const textY = ann.y - 8 < 16 ? ann.y + 20 : ann.y - 8;
+          ctx.fillText(ann.text, ann.x + 4, textY);
+        }
+      }
+
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/png')
+      );
+      if (!blob) {
+        onWrapGenerate(imageUrl, referenceImageUrls);
+        onClose();
+        return;
+      }
+
+      const wrappedUrl = URL.createObjectURL(blob);
+      onWrapGenerate(wrappedUrl, referenceImageUrls);
+      onClose();
+    } catch (err) {
+      console.error('Failed to create wrapped image:', err);
+      onWrapGenerate(imageUrl, referenceImageUrls);
+      onClose();
+    }
+  }, [onWrapGenerate, imageUrl, referenceImageUrls, onClose]);
+
   const handleReusePrompt = useCallback(() => {
     const textToReuse = (displayPrompt ?? prompt)?.trim();
     if (textToReuse && onReusePrompt) {
@@ -230,23 +545,35 @@ const ImageModal: React.FC<ImageModalProps> = ({
         <div
           ref={containerRef}
           className={`relative flex-1 flex items-center justify-center min-h-0 overflow-hidden ${
-            canPan ? 'cursor-grab' : ''
-          } ${isDragging ? 'cursor-grabbing' : ''}`}
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
+            canPan && !isAnnotating ? 'cursor-grab' : ''
+          } ${isDragging && !isAnnotating ? 'cursor-grabbing' : ''}`}
+          onWheel={isAnnotating ? undefined : handleWheel}
+          onMouseDown={isAnnotating ? undefined : handleMouseDown}
           onDoubleClick={resetView}
           style={{ touchAction: 'none' }}
         >
           <img
+            ref={imageElementRef}
             src={imageUrl}
             alt="Generated image"
             className="max-w-full max-h-full object-contain select-none pointer-events-none md:max-w-none md:max-h-full"
             style={{
               transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
               transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+              opacity: isAnnotating ? 0 : 1,
             }}
             draggable={false}
           />
+
+          {isAnnotating && (
+            <canvas
+              ref={annotationCanvasRef}
+              className="absolute inset-0 z-10 cursor-crosshair"
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+            />
+          )}
 
           {/* Prev / Next arrows - sides of image area */}
           {hasPrev && onPrev && (
@@ -332,6 +659,16 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 />
               </svg>
             </button>
+            <button
+              onClick={handleToggleAnnotate}
+              className={`px-3 h-9 flex items-center justify-center rounded-lg text-xs font-medium transition-all ${
+                isAnnotating
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              {isAnnotating ? 'Exit edit mode' : 'Edit mode'}
+            </button>
           </div>
         </div>
 
@@ -386,6 +723,37 @@ const ImageModal: React.FC<ImageModalProps> = ({
                   Prompt
                 </p>
                 <p className="text-white/90 text-sm leading-relaxed">{displayPrompt ?? prompt}</p>
+              </div>
+            )}
+
+            {annotationsState.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-white/60 text-xs font-medium uppercase tracking-wider">
+                    Edits
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleClearAnnotations}
+                    className="text-[11px] text-white/40 hover:text-white/70 transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {annotationsState.map((ann, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <div className="mt-1 w-3 h-3 rounded-sm border border-red-400" />
+                      <textarea
+                        value={ann.text ?? ''}
+                        onChange={(e) => handleAnnotationTextChange(index, e.target.value)}
+                        placeholder="Describe this area…"
+                        rows={2}
+                        className="w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-red-500/60 focus:border-red-500/60 resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -447,11 +815,81 @@ const ImageModal: React.FC<ImageModalProps> = ({
             </div>
           </div>
 
-          <div className="flex-shrink-0 p-4 border-t border-white/10 space-y-2">
+          <div className="flex-shrink-0 p-4 border-t border-white/10 space-y-3">
+            {/* Primary action */}
+            {(displayPrompt ?? prompt)?.trim() && onReusePrompt && (
+              <button
+                onClick={handleWrapAndReuse}
+                disabled={!hasAnnotations}
+                className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4h9m0 0l-3-3m3 3l-3 3M4 12h9m7 8H11m0 0l3-3m-3 3l3 3m7-8H11"
+                  />
+                </svg>
+                Wrap & regenerate
+              </button>
+            )}
+
+            {/* Secondary actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleReusePrompt}
+                disabled={!(displayPrompt ?? prompt)?.trim() || !onReusePrompt}
+                className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white/90 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/15 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Reuse prompt
+              </button>
+              {isShareSupported && (
+                <button
+                  onClick={handleShare}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white/90 py-2.5 rounded-xl text-sm font-medium transition-all border border-white/15"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                    />
+                  </svg>
+                  Share
+                </button>
+              )}
+            </div>
+
+            {/* Utility actions */}
             <div className="flex gap-2">
               <button
                 onClick={handleDownload}
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#16181c]/80 hover:bg-[#1a1d22]/95 text-white/90 py-2.5 rounded-xl text-xs font-medium transition-all border border-white/10"
               >
                 <svg
                   className="w-4 h-4"
@@ -470,7 +908,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
               </button>
               <button
                 onClick={handleCopyToClipboard}
-                className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#16181c]/80 hover:bg-[#1a1d22]/95 text-white/90 py-2.5 rounded-xl text-xs font-medium transition-all border border-white/10"
               >
                 <svg
                   className="w-4 h-4"
@@ -488,54 +926,14 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 Copy
               </button>
             </div>
-            {isShareSupported && (
-              <button
-                onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white py-2.5 rounded-xl text-sm font-medium transition-all"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                  />
-                </svg>
-                Share
-              </button>
-            )}
-            {(displayPrompt ?? prompt)?.trim() && onReusePrompt && (
-              <button
-                onClick={handleReusePrompt}
-                className="w-full flex items-center justify-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 py-2.5 rounded-xl text-sm font-medium transition-all"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                Reuse prompt
-              </button>
-            )}
+
+            {/* Destructive */}
             {imageId && onDelete && (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="w-full flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-300 py-2.5 rounded-xl text-xs font-medium transition-all disabled:opacity-50"
                 aria-label="Delete image"
               >
                 {isDeleting ? (

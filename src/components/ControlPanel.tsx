@@ -117,7 +117,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   useEffect(() => {
     if (!referenceImageUrlsToInject?.length || !onReferenceImagesInjected) return;
-    const urls = [...new Set(referenceImageUrlsToInject.filter((u): u is string => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://'))))].slice(0, MAX_REFERENCE_IMAGES);
+    const urls = [...new Set(
+      referenceImageUrlsToInject.filter(
+        (u): u is string =>
+          typeof u === 'string' &&
+          (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('blob:'))
+      )
+    )].slice(0, MAX_REFERENCE_IMAGES);
     if (urls.length === 0) {
       onReferenceImagesInjected();
       return;
