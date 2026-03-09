@@ -21,6 +21,8 @@ import LandingPage from './pages/LandingPage';
 import MoodboardsPage from './pages/MoodboardsPage';
 import './App.css';
 
+// App shell: grid, control panel, modals (wrap settings, image modal, etc.)
+
 type GridItem =
   | { type: 'image'; id: string; url: string; thumbUrl?: string; aspectRatio: string; prompt: string; imageSize: string; model?: string; referenceImageUrls?: string[]; creator?: CreatorInfo }
   | { type: 'placeholder'; id: string; status: 'generating' | 'queued'; aspectRatio: string; imageSize: string };
@@ -888,15 +890,7 @@ function AppShell() {
                       model: wrapModel,
                       referenceImages: [base64],
                     };
-                    const extraRefs =
-                      wrapSettings.referenceImageUrls?.filter(
-                        (u): u is string =>
-                          typeof u === 'string' &&
-                          (u.startsWith('http://') || u.startsWith('https://'))
-                      ) ?? [];
-                    if (extraRefs.length > 0) {
-                      params.referenceImageUrls = extraRefs;
-                    }
+                    // Do not pass referenceImageUrls: only the wrapped image is the reference.
                     handleGenerate(params, wrapBatchSize);
                     setWrapSettings(null);
                   } catch (err) {
