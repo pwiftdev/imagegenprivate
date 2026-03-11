@@ -384,6 +384,7 @@ export interface ImageStats {
   totalApiCalls: number;
   totalCost: number;
   monthlyOverview: { month: string; images: number; cost: number }[];
+  dailyOverview: { date: string; dateLabel: string; images: number; cost: number }[];
   recentActivity: { date: string; count: number; cost: number }[];
   byQuality?: { '1K': number; '2K': number; '4K': number };
 }
@@ -399,6 +400,7 @@ export async function fetchUserStats(userId: string): Promise<ImageStats> {
       totalApiCalls: 0,
       totalCost: 0,
       monthlyOverview: [],
+      dailyOverview: [],
       recentActivity: [],
       byQuality: { '1K': 0, '2K': 0, '4K': 0 }
     };
@@ -408,7 +410,8 @@ export async function fetchUserStats(userId: string): Promise<ImageStats> {
     .from('images')
     .select('id, created_at, image_size')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(10000); // avoid default 1000 truncation for stats accuracy
 
   return buildUserImageStats(rows || [], error);
 }
@@ -424,6 +427,7 @@ function buildUserImageStats(
       totalApiCalls: 0,
       totalCost: 0,
       monthlyOverview: [],
+      dailyOverview: [],
       recentActivity: [],
       byQuality: { '1K': 0, '2K': 0, '4K': 0 }
     };
@@ -436,12 +440,14 @@ function buildUserImageStats(
   const byMonth = new Map<string, { images: number; cost: number }>();
   const byDay = new Map<string, { count: number; cost: number }>();
 
+  const pad2 = (n: number) => String(n).padStart(2, '0');
   for (const img of images) {
     const size = (img.image_size || '1K') as keyof typeof byQuality;
     if (size in byQuality) byQuality[size as '1K' | '2K' | '4K']++;
     const date = new Date(img.created_at);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const dayKey = date.toISOString().slice(0, 10);
+    // Use local date so chart matches user's calendar (not UTC)
+    const monthKey = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+    const dayKey = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 
     if (!byMonth.has(monthKey)) byMonth.set(monthKey, { images: 0, cost: 0 });
     const m = byMonth.get(monthKey)!;
@@ -471,11 +477,29 @@ function buildUserImageStats(
       cost: data.cost
     }));
 
+  // Daily overview: last 30 days (local), fill missing days with 0 (for chart)
+  const dailyOverview: { date: string; dateLabel: string; images: number; cost: number }[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const entry = byDay.get(dateStr);
+    dailyOverview.push({
+      date: dateStr,
+      dateLabel: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      images: entry?.count ?? 0,
+      cost: entry?.cost ?? 0,
+    });
+  }
+
   return {
     totalImages,
     totalApiCalls: totalImages,
     totalCost,
     monthlyOverview,
+    dailyOverview,
     recentActivity,
     byQuality
   };

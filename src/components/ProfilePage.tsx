@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   Tooltip,
@@ -10,7 +8,11 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  CartesianGrid,
 } from 'recharts';
 import { fetchProfile, updateProfile, uploadAvatar } from '../services/profileService';
 import { fetchUserStats } from '../services/imageStorage';
@@ -37,6 +39,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [stats, setStats] = useState<ImageStats | null>(null);
   const [section, setSection] = useState<Section>('overview');
+  const [creditsChartView, setCreditsChartView] = useState<'daily' | 'monthly'>('daily');
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [passwordResetLoading, setPasswordResetLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,55 +257,149 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
               </div>
 
               {/* Stats cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
                   <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Total Kreations</p>
                   <p className="text-2xl font-bold text-white">{(stats?.totalImages ?? 0).toLocaleString()}</p>
                 </div>
-                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                  <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Credits Spent</p>
+                  <p className="text-2xl font-bold text-white">{(stats?.totalImages ?? 0).toLocaleString()}</p>
+                  <p className="text-white/40 text-xs mt-0.5">1 credit per image</p>
+                </div>
+                <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
                   <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">This Month</p>
                   <p className="text-2xl font-bold text-white">{thisMonth}</p>
                   <p className="text-white/40 text-xs mt-0.5">{currentMonthStr}</p>
                 </div>
-                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
                   <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Last Active</p>
                   <p className="text-lg font-bold text-white">{stats?.recentActivity?.[0]?.date ?? '—'}</p>
                   {stats?.recentActivity?.[0] && (
                     <p className="text-white/40 text-xs mt-0.5">{stats.recentActivity[0].count} images</p>
                   )}
                 </div>
-                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
                   <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Active Days</p>
                   <p className="text-2xl font-bold text-white">{stats?.recentActivity?.length ?? 0}</p>
                   <p className="text-white/40 text-xs mt-0.5">days with activity</p>
                 </div>
               </div>
 
-              {/* Charts row */}
+              {/* Credits over time – line chart */}
+              <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-6 mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="landing-font-display text-lg font-semibold text-white mb-0.5">Credits over time</h2>
+                    <p className="text-white/45 text-xs">Credits spent (1 credit = 1 image generated)</p>
+                  </div>
+                  <div className="flex rounded-lg bg-white/5 border border-white/10 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setCreditsChartView('daily')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        creditsChartView === 'daily' ? 'bg-blue-500/25 text-blue-200' : 'text-white/60 hover:text-white'
+                      }`}
+                    >
+                      Daily
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreditsChartView('monthly')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        creditsChartView === 'monthly' ? 'bg-blue-500/25 text-blue-200' : 'text-white/60 hover:text-white'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                  </div>
+                </div>
+                {(creditsChartView === 'daily' ? stats?.dailyOverview : stats?.monthlyOverview) &&
+                (creditsChartView === 'daily' ? stats?.dailyOverview : stats?.monthlyOverview)!.length > 0 ? (
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={
+                          creditsChartView === 'daily'
+                            ? stats!.dailyOverview
+                            : [...stats!.monthlyOverview].reverse().slice(-8)
+                        }
+                        margin={{ top: 12, right: 12, left: 0, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                        <XAxis
+                          dataKey={creditsChartView === 'daily' ? 'dateLabel' : 'month'}
+                          stroke="#64748b"
+                          fontSize={10}
+                          tickLine={false}
+                          axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                          interval={creditsChartView === 'daily' ? 'preserveStartEnd' : 0}
+                        />
+                        <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(13, 14, 16, 0.98)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            borderRadius: '10px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                            padding: '10px 14px',
+                            color: '#e2e8f0',
+                          }}
+                          labelStyle={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}
+                          formatter={(value: number | undefined) => [`${value ?? 0} credits`, 'Credits spent']}
+                          cursor={{ stroke: 'rgba(59, 130, 246, 0.5)', strokeWidth: 1 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="images"
+                          name="Credits"
+                          stroke="#3b82f6"
+                          strokeWidth={2.5}
+                          dot={{ fill: '#3b82f6', strokeWidth: 0, r: creditsChartView === 'daily' ? 2 : 4 }}
+                          activeDot={{ r: 6, fill: '#3b82f6', stroke: 'rgba(255,255,255,0.4)', strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-56 flex items-center justify-center text-white/40 text-sm">
+                    No activity yet — start creating to see your credits over time
+                  </div>
+                )}
+              </div>
+
+              {/* Charts row – Monthly activity + Quality breakdown */}
               <div className="grid lg:grid-cols-3 gap-6 mb-8">
-                <div className="lg:col-span-2 rounded-2xl bg-white/[0.04] border border-white/10 p-6">
-                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Monthly Activity</h2>
+                <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-1">Monthly activity</h2>
+                  <p className="text-white/45 text-xs mb-4">Images generated per month</p>
                   {stats?.monthlyOverview && stats.monthlyOverview.length > 0 ? (
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={[...stats.monthlyOverview].reverse().slice(-6)}
-                          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                        >
-                          <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
-                          <YAxis stroke="#94a3b8" fontSize={12} allowDecimals={false} />
+                        <AreaChart data={[...stats.monthlyOverview].reverse().slice(-6)} margin={{ top: 12, right: 12, left: 0, bottom: 4 }}>
+                          <defs>
+                            <linearGradient id="activityAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
+                              <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                          <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} />
+                          <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: 'rgba(8, 9, 10, 0.95)',
-                              border: '1px solid rgba(255,255,255,0.15)',
-                              borderRadius: '12px',
-                              color: '#e2e8f0',
+                              backgroundColor: 'rgba(13, 14, 16, 0.98)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '10px',
+                              boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                              padding: '10px 14px',
                             }}
-                            labelStyle={{ color: '#94a3b8' }}
-                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                            labelStyle={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}
+                            formatter={(value: number | undefined) => [`${value ?? 0} images`, 'Generated']}
+                            cursor={{ stroke: 'rgba(59, 130, 246, 0.5)', strokeWidth: 1 }}
                           />
-                          <Bar dataKey="images" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                          <Area type="monotone" dataKey="images" fill="url(#activityAreaGradient)" stroke="#3b82f6" strokeWidth={2} />
+                        </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   ) : (
@@ -312,37 +409,57 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
                   )}
                 </div>
 
-                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
-                  <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Quality Breakdown</h2>
+                <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-6">
+                  <h2 className="landing-font-display text-lg font-semibold text-white mb-1">Quality breakdown</h2>
+                  <p className="text-white/45 text-xs mb-4">Distribution by output quality</p>
                   {qualityChartData.length > 0 ? (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={qualityChartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
-                            paddingAngle={2}
-                            dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
-                          >
-                            {qualityChartData.map((entry, i) => (
-                              <Cell key={i} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'rgba(8, 9, 10, 0.95)',
-                              border: '1px solid rgba(255,255,255,0.15)',
-                              borderRadius: '12px',
-                              color: '#e2e8f0',
-                            }}
-                          />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                        </PieChart>
-                      </ResponsiveContainer>
+                    <div className="h-64 flex flex-col">
+                      <div className="flex-1 min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={qualityChartData}
+                              cx="50%"
+                              cy="45%"
+                              innerRadius={52}
+                              outerRadius={78}
+                              paddingAngle={3}
+                              dataKey="value"
+                              stroke="rgba(8,9,10,0.6)"
+                              strokeWidth={2}
+                            >
+                              {qualityChartData.map((entry, i) => (
+                                <Cell key={i} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'rgba(13, 14, 16, 0.98)',
+                                border: '1px solid rgba(255,255,255,0.12)',
+                                borderRadius: '10px',
+                                boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                                padding: '10px 14px',
+                                color: '#e2e8f0',
+                              }}
+                              itemStyle={{ color: '#e2e8f0' }}
+                              labelStyle={{ color: '#94a3b8' }}
+                              formatter={(value: number | undefined, _: unknown, item: { payload?: { name?: string } }) => [
+                                `${value ?? 0} images (${item?.payload?.name ?? ''})`,
+                                'Quality',
+                              ]}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-2 pt-3 border-t border-white/8">
+                        {qualityChartData.map((d) => (
+                          <div key={d.name} className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                            <span className="text-white/70 text-xs font-medium">{d.name}</span>
+                            <span className="text-white/50 text-xs">{d.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <div className="h-64 flex items-center justify-center text-white/40 text-sm text-center px-4">

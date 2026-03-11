@@ -67,6 +67,21 @@ export default function LandingPage() {
   const [pricingRef, pricingInView] = useScrollReveal({ threshold: 0.15 });
   const [ctaRef, ctaInView] = useScrollReveal({ threshold: 0.1 });
 
+  const [glowPos, setGlowPos] = useState<{ x: number; y: number } | null>(null);
+  const glowContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleGlowMouseMove = (e: React.MouseEvent) => {
+    const el = glowContainerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setGlowPos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
+
+  const handleGlowMouseLeave = () => setGlowPos(null);
+
   const showcasePerCol = showcaseThumbnails.length > 0 ? Math.ceil(showcaseThumbnails.length / 3) : 0;
   const showcaseCol1 = showcaseThumbnails.slice(0, showcasePerCol);
   const showcaseCol2 = showcaseThumbnails.slice(showcasePerCol, showcasePerCol * 2);
@@ -379,19 +394,39 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="relative py-36 px-6 border-t border-white/[0.06]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_100%,rgba(59,130,246,0.08),transparent)] pointer-events-none" />
-        <div ref={ctaRef} className={`max-w-2xl mx-auto text-center relative z-10 landing-scroll-reveal ${ctaInView ? 'landing-in-view' : ''}`}>
-          <h2 className="landing-font-display text-3xl md:text-5xl font-bold text-white landing-reveal-item">
-            Built for creators who ship
-          </h2>
-          <p className="mt-6 text-white/55 text-lg landing-reveal-item">
-            Join agencies and freelancers who switched to pay-as-you-go. Less waste, more control.
-          </p>
-          <Link
-            to="/app"
-            className="mt-12 inline-flex px-10 py-5 rounded-2xl bg-white text-[#08090a] font-bold text-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 shadow-xl shadow-white/10 landing-reveal-item"
+        <div ref={ctaRef} className={`max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center relative z-10 landing-scroll-reveal ${ctaInView ? 'landing-in-view' : ''}`}>
+          <div
+            ref={glowContainerRef}
+            className="order-2 md:order-1 flex justify-center relative"
+            onMouseMove={handleGlowMouseMove}
+            onMouseLeave={handleGlowMouseLeave}
           >
-            Open Kreator
-          </Link>
+            <div className="relative w-full max-w-md">
+              <img src="/shipfastersquare.png" alt="Ship faster" className="w-full object-contain rounded-[2rem] border border-white/10 shadow-2xl shadow-black/30 ring-1 ring-white/5 relative z-10" />
+              {glowPos && (
+                <div
+                  className="absolute inset-0 rounded-[2rem] pointer-events-none z-20 mix-blend-screen"
+                  style={{
+                    background: `radial-gradient(circle 180px at ${glowPos.x}px ${glowPos.y}px, rgba(139, 92, 246, 0.45) 0%, rgba(99, 102, 241, 0.25) 35%, rgba(59, 130, 246, 0.1) 55%, transparent 75%)`,
+                  }}
+                />
+              )}
+            </div>
+          </div>
+          <div className="order-1 md:order-2 text-center md:text-left">
+            <h2 className="landing-font-display text-3xl md:text-5xl font-bold text-white landing-reveal-item">
+              Built for creators who ship
+            </h2>
+            <p className="mt-6 text-white/55 text-lg landing-reveal-item">
+              Join agencies and freelancers who switched to pay-as-you-go. Less waste, more control.
+            </p>
+            <Link
+              to="/app"
+              className="mt-12 inline-flex px-10 py-5 rounded-2xl bg-white text-[#08090a] font-bold text-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 shadow-xl shadow-white/10 landing-reveal-item"
+            >
+              Open Kreator
+            </Link>
+          </div>
         </div>
       </section>
 
