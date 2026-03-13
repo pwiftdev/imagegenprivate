@@ -1192,6 +1192,7 @@ function AppShell() {
         return (
           <ImageModal
             imageUrl={item.url}
+            thumbUrl={item.thumbUrl || item.url}
             prompt={item.prompt}
             aspectRatio={item.aspectRatio}
             imageSize={item.imageSize}

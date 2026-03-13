@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 
 interface ImageModalProps {
   imageUrl: string;
+  thumbUrl?: string;
   prompt?: string;
   aspectRatio?: string;
   imageSize?: string;
@@ -61,6 +62,7 @@ const MOODBOARD_PROMPT_PREFIX = 'First reference photo is the main reference. Al
 
 const ImageModal: React.FC<ImageModalProps> = ({
   imageUrl,
+  thumbUrl,
   prompt,
   aspectRatio,
   imageSize,
@@ -84,6 +86,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const annotationCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageElementRef = useRef<HTMLImageElement | null>(null);
+
+  const [displaySrc, setDisplaySrc] = useState<string>(thumbUrl || imageUrl);
+  const [fullImageLoaded, setFullImageLoaded] = useState(false);
 
   type Annotation = {
     x: number;
@@ -118,6 +123,20 @@ const ImageModal: React.FC<ImageModalProps> = ({
     drawHeight: number;
   } | null>(null);
   const fetchedImageRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    setDisplaySrc(thumbUrl || imageUrl);
+    setFullImageLoaded(false);
+
+    if (imageUrl) {
+      const highRes = new Image();
+      highRes.onload = () => {
+        setDisplaySrc(imageUrl);
+        setFullImageLoaded(true);
+      };
+      highRes.src = imageUrl;
+    }
+  }, [imageUrl, thumbUrl]);
 
   const usedMoodboard = Boolean(prompt?.startsWith(MOODBOARD_PROMPT_PREFIX));
   const displayPrompt = usedMoodboard && prompt ? prompt.slice(MOODBOARD_PROMPT_PREFIX.length).trim() : prompt;
@@ -592,13 +611,13 @@ const ImageModal: React.FC<ImageModalProps> = ({
         >
           <img
             ref={imageElementRef}
-            src={imageUrl}
+            src={displaySrc}
             alt="Generated image"
-            className="max-w-full max-h-full object-contain select-none pointer-events-none md:max-w-none md:max-h-full"
+            className="max-w-full max-h-full object-contain select-none pointer-events-none md:max-w-none md:max-h-full transition-opacity duration-200"
             style={{
               transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-              transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-              opacity: isAnnotating ? 0 : 1,
+              transition: `${isDragging ? 'none' : 'transform 0.15s ease-out'}, opacity 0.2s ease-out`,
+              opacity: isAnnotating ? 0 : fullImageLoaded ? 1 : 0.9,
             }}
             draggable={false}
           />
