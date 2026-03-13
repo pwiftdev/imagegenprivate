@@ -384,6 +384,7 @@ export interface ImageStats {
   totalApiCalls: number;
   totalCost: number;
   monthlyOverview: { month: string; images: number; cost: number }[];
+  thisMonthImages: number;
   dailyOverview: { date: string; dateLabel: string; images: number; cost: number }[];
   recentActivity: { date: string; count: number; cost: number }[];
   byQuality?: { '1K': number; '2K': number; '4K': number };
@@ -400,25 +401,82 @@ export async function fetchUserStats(userId: string): Promise<ImageStats> {
       totalApiCalls: 0,
       totalCost: 0,
       monthlyOverview: [],
+      thisMonthImages: 0,
       dailyOverview: [],
       recentActivity: [],
       byQuality: { '1K': 0, '2K': 0, '4K': 0 }
     };
   }
 
-  const { data: rows, error } = await supabase
+  // 1) Get accurate total count (not limited by row caps)
+  const { count, error: countError } = await supabase
     .from('images')
-    .select('id, created_at, image_size')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(10000); // avoid default 1000 truncation for stats accuracy
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
 
-  return buildUserImageStats(rows || [], error);
+  if (countError) {
+    console.error('Failed to count images for stats:', countError);
+  }
+
+  // Exact count for current calendar month (for "This Month" card)
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startIso = startOfMonth.toISOString();
+  const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextIso = startOfNextMonth.toISOString();
+  const { count: thisMonthCount, error: thisMonthError } = await supabase
+    .from('images')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', startIso)
+    .lt('created_at', nextIso);
+
+  if (thisMonthError) {
+    console.error('Failed to count this month images for stats:', thisMonthError);
+  }
+
+  // 2) Fetch rows for charts / breakdowns, with pagination to avoid server row caps
+  type Row = { id: string; created_at: string; image_size?: string | null };
+  const allRows: Row[] = [];
+  const pageSize = 1000;
+  const totalToFetch = typeof count === 'number' ? count : undefined;
+
+  let from = 0;
+  for (;;) {
+    const to = from + pageSize - 1;
+    const { data, error: pageError } = await supabase
+      .from('images')
+      .select('id, created_at, image_size')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (pageError) {
+      return buildUserImageStats(allRows, pageError, typeof count === 'number' ? count : undefined, typeof thisMonthCount === 'number' ? thisMonthCount : undefined);
+    }
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+
+    if (data.length < pageSize) break;
+    from += pageSize;
+    if (totalToFetch !== undefined && from >= totalToFetch) break;
+    // Safety cap: avoid unbounded fetch if count is missing
+    if (totalToFetch === undefined && from >= 10000) break;
+  }
+
+  return buildUserImageStats(
+    allRows,
+    null,
+    typeof count === 'number' ? count : undefined,
+    typeof thisMonthCount === 'number' ? thisMonthCount : undefined
+  );
 }
 
 function buildUserImageStats(
   images: { id: string; created_at: string; image_size?: string | null }[],
-  error: { message: string } | null
+  error: { message: string } | null,
+  totalImagesOverride?: number,
+  thisMonthImagesOverride?: number
 ): ImageStats {
   if (error) {
     console.error('Failed to fetch stats:', error);
@@ -427,13 +485,14 @@ function buildUserImageStats(
       totalApiCalls: 0,
       totalCost: 0,
       monthlyOverview: [],
+      thisMonthImages: 0,
       dailyOverview: [],
       recentActivity: [],
       byQuality: { '1K': 0, '2K': 0, '4K': 0 }
     };
   }
 
-  const totalImages = images.length;
+  const totalImages = typeof totalImagesOverride === 'number' ? totalImagesOverride : images.length;
   const totalCost = totalImages * COST_PER_IMAGE;
 
   const byQuality = { '1K': 0 as number, '2K': 0 as number, '4K': 0 as number };
@@ -494,11 +553,24 @@ function buildUserImageStats(
     });
   }
 
+  // Derive this month's count from map when we don't have an explicit override
+  let thisMonthImages = 0;
+  if (typeof thisMonthImagesOverride === 'number') {
+    thisMonthImages = thisMonthImagesOverride;
+  } else {
+    const now = new Date();
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const currentKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+    const monthEntry = byMonth.get(currentKey);
+    thisMonthImages = monthEntry?.images ?? 0;
+  }
+
   return {
     totalImages,
     totalApiCalls: totalImages,
     totalCost,
     monthlyOverview,
+    thisMonthImages,
     dailyOverview,
     recentActivity,
     byQuality

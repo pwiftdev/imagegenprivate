@@ -116,8 +116,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
   };
 
   const currentMonthStr = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  const thisMonthEntry = stats?.monthlyOverview?.find((m) => m.month === currentMonthStr);
-  const thisMonth = thisMonthEntry?.images ?? 0;
+  const thisMonth = stats?.thisMonthImages ?? 0;
 
   const qualityChartData = stats?.byQuality
     ? (['1K', '2K', '4K'] as const)
