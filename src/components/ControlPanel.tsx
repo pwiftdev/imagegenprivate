@@ -68,9 +68,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [useMoodboardModalOpen, setUseMoodboardModalOpen] = useState(false);
   const [moodboardInUse, setMoodboardInUse] = useState(false);
   const [atMention, setAtMention] = useState<{ atIndex: number; filter: string; cursorPos: number } | null>(null);
+  const [isLoadingReferenceUrls, setIsLoadingReferenceUrls] = useState(false);
+  const [referenceLoadResult, setReferenceLoadResult] = useState<{ loaded: number; failed: number; total: number } | null>(null);
 
   const objectUrlsRef = useRef<string[]>([]);
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  /** Ignore stale reference-injection completions when user triggers another Re-run before the first finishes */
+  const referenceInjectionIdRef = useRef(0);
+  const singleRefInjectionIdRef = useRef(0);
+  const moodboardInjectionIdRef = useRef(0);
 
   const MOODBOARD_PROMPT_PREFIX = 'First reference photo is the main reference. All other reference images are moodboard, to help you reach the final output for the prompt. ';
 
@@ -144,10 +150,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       onReferenceImageInjected?.();
       return;
     }
+    const injectionId = ++singleRefInjectionIdRef.current;
+    setReferenceLoadResult(null);
+    setIsLoadingReferenceUrls(true);
     onReferenceImageInjected?.();
     (async () => {
       try {
         const base64 = await compressImageFromUrl(url);
+        if (injectionId !== singleRefInjectionIdRef.current) return;
         let didAdd = false;
         setReferenceImages(prev => {
           if (prev.includes(url) || prev.length >= MAX_REFERENCE_IMAGES) return prev;
@@ -157,8 +167,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         if (didAdd) {
           setReferenceImagesBase64(prev => (prev.length >= MAX_REFERENCE_IMAGES ? prev : [...prev, base64]));
         }
+        setReferenceLoadResult({ loaded: 1, failed: 0, total: 1 });
       } catch (err) {
         console.error('Failed to add reference image:', err);
+        if (injectionId === singleRefInjectionIdRef.current) {
+          setReferenceLoadResult({ loaded: 0, failed: 1, total: 1 });
+        }
+      } finally {
+        if (injectionId === singleRefInjectionIdRef.current) {
+          setIsLoadingReferenceUrls(false);
+        }
       }
     })();
   }, [referenceImageUrlToInject, onReferenceImageInjected]);
@@ -176,10 +194,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       onReferenceImagesInjected();
       return;
     }
+    const injectionId = ++referenceInjectionIdRef.current;
+    const total = urls.length;
+    setReferenceLoadResult(null);
+    setIsLoadingReferenceUrls(true);
     onReferenceImagesInjected();
     (async () => {
       const newUrls: string[] = [];
       const newBase64: string[] = [];
+      let failed = 0;
       for (const url of urls) {
         try {
           const base64 = await compressImageFromUrl(url);
@@ -187,12 +210,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           newBase64.push(base64);
         } catch (err) {
           console.error('Failed to add reference image from Re-run:', err);
+          failed++;
         }
       }
+      if (injectionId !== referenceInjectionIdRef.current) return;
       if (newUrls.length > 0) {
         setReferenceImages(newUrls);
         setReferenceImagesBase64(newBase64);
       }
+      setReferenceLoadResult({ loaded: newUrls.length, failed, total });
+      setIsLoadingReferenceUrls(false);
     })();
   }, [referenceImageUrlsToInject, onReferenceImagesInjected]);
 
@@ -204,6 +231,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       onMoodboardInjected();
       return;
     }
+    const injectionId = ++moodboardInjectionIdRef.current;
     setMoodboardInUse(true);
     onMoodboardInjected();
     (async () => {
@@ -218,10 +246,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           console.error('Failed to add moodboard reference image:', err);
         }
       }
+      if (injectionId !== moodboardInjectionIdRef.current) return;
       setReferenceImages(newUrls);
       setReferenceImagesBase64(newBase64);
     })();
   }, [moodboardUrlsToInject, onMoodboardInjected]);
+
+  // Auto-clear reference load result after 5s so it doesn't stay forever
+  useEffect(() => {
+    if (!referenceLoadResult) return;
+    const t = setTimeout(() => setReferenceLoadResult(null), 5000);
+    return () => clearTimeout(t);
+  }, [referenceLoadResult]);
 
   // Cleanup object URLs when component unmounts
   useEffect(() => {
@@ -235,6 +271,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   }, []);
 
   const addImagesFromFiles = useCallback(async (files: File[]) => {
+    setReferenceLoadResult(null);
     const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
     if (validFiles.length === 0) return;
     const remaining = MAX_REFERENCE_IMAGES - referenceImages.length;
@@ -272,6 +309,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   }, [addImagesFromFiles]);
 
   const removeReferenceImage = useCallback((index: number) => {
+    setReferenceLoadResult(null);
     setReferenceImages(prev => {
       const urlToRemove = prev[index];
       if (urlToRemove?.startsWith('blob:')) {
@@ -465,7 +503,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         </svg>
                         Moodboard
                       </span>
-                      <div className="relative flex items-center gap-2 p-2.5 pr-10 rounded-xl bg-white/[0.03] border border-white/10">
+                      <div className="relative flex items-center gap-2 p-2.5 pr-10 rounded-xl bg-white/[0.03] border border-white/10 min-h-[100px]">
                         <button
                           type="button"
                           onClick={() => {
@@ -625,11 +663,31 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 )}
                 </div>
               </div>
-              {!moodboardInUse && (
-              <p className="text-white/55 text-xs mt-1">
-                Max {MAX_REFERENCE_IMAGES} refs · Drag to reorder · Ctrl/Cmd+V to paste
-              </p>
-            )}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                {!moodboardInUse && (
+                  <>
+                    {isLoadingReferenceUrls ? (
+                      <span className="text-blue-400/90 flex items-center gap-1.5">
+                        <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-blue-400/50 border-t-blue-300 animate-spin" />
+                        Loading references…
+                      </span>
+                    ) : referenceLoadResult ? (
+                      referenceLoadResult.failed > 0 ? (
+                        <span className="text-amber-400/90">
+                          {referenceLoadResult.loaded} of {referenceLoadResult.total} loaded ({referenceLoadResult.failed} failed)
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400/90">
+                          {referenceLoadResult.loaded} reference image{referenceLoadResult.loaded !== 1 ? 's' : ''} loaded
+                        </span>
+                      )
+                    ) : null}
+                    <p className="text-white/55">
+                      Max {MAX_REFERENCE_IMAGES} refs · Drag to reorder · Ctrl/Cmd+V to paste
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Prompt Input */}
