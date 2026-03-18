@@ -74,15 +74,21 @@ export async function generateVideoFromImage(
     if (status === 'completed') {
       onProgress?.('Generation complete! Fetching video…\n');
 
-      // Step 3: get video URL from /content endpoint
-      const contentRes = await fetch(`${API_BASE}/api/video/result/${taskId}`);
-      if (!contentRes.ok) {
-        throw new Error('Failed to get video content');
-      }
-      const content = (await contentRes.json()) as { url?: string };
-      if (!content.url) throw new Error('No video URL in content response');
+      // Step 3: get video — backend may return JSON { url } or raw MP4 binary.
+      // Either way, the proxy URL itself works as a direct video source.
+      const resultUrl = `${API_BASE}/api/video/result/${taskId}`;
 
-      return { videoUrl: content.url };
+      const contentRes = await fetch(resultUrl);
+      if (!contentRes.ok) throw new Error('Failed to get video content');
+
+      const ct = (contentRes.headers.get('content-type') || '').toLowerCase();
+      if (ct.includes('application/json')) {
+        const content = (await contentRes.json()) as { url?: string };
+        if (content.url) return { videoUrl: content.url };
+      }
+
+      // Binary MP4 — use the proxy URL directly as the video src
+      return { videoUrl: resultUrl };
     }
 
     if (status === 'failed') {
