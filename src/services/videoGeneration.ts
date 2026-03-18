@@ -1,6 +1,7 @@
 /**
- * Sora 2 image-to-video via LaoZhang API (proxied by backend).
- * See: https://docs.laozhang.ai/en/api-capabilities/sora2/overview
+ * Sora 2 image-to-video via LaoZhang Async API (proxied by backend).
+ * Create task (returns immediately), poll status, then get video from result endpoint.
+ * See: https://docs.laozhang.ai/en/api-capabilities/sora2/async-api
  */
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -24,11 +25,12 @@ export interface GenerateVideoResult {
   videoUrl: string;
 }
 
-const VIDEO_URL_REGEX = /https:\/\/[^\s)\]"]+\.mp4/;
+const POLL_INTERVAL_MS = 4000;
+const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 
 /**
- * Generate video from image using Sora 2; streams progress and returns final video URL.
- * Video links are valid 1 day — download promptly.
+ * Generate video from image using Sora 2 Async API.
+ * Creates task (no Heroku timeout), polls until completed, returns URL to our proxy for the video.
  */
 export async function generateVideoFromImage(
   params: GenerateVideoParams,
@@ -40,56 +42,59 @@ export async function generateVideoFromImage(
     throw new Error('VITE_API_BASE_URL is not set');
   }
 
-  const response = await fetch(`${API_BASE}/api/video/generate`, {
+  const createRes = await fetch(`${API_BASE}/api/video/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, imageUrl, model }),
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(err?.error || `Video generation failed: ${response.status}`);
+  if (!createRes.ok) {
+    const err = await createRes.json().catch(() => ({ error: createRes.statusText }));
+    throw new Error(err?.error || `Video task failed: ${createRes.status}`);
   }
 
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error('No response body');
+  const { taskId } = (await createRes.json()) as { taskId?: string };
+  if (!taskId) {
+    throw new Error('No task ID returned');
   }
 
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let fullContent = '';
+  onProgress?.('Task created. Waiting for video (2–5 min)…\n');
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
 
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const payload = line.slice(6).trim();
-        if (payload === '[DONE]') continue;
-        try {
-          const data = JSON.parse(payload);
-          const content = data?.choices?.[0]?.delta?.content;
-          if (typeof content === 'string') {
-            fullContent += content;
-            onProgress?.(content);
-          }
-        } catch {
-          // ignore non-JSON lines
-        }
-      }
+    const statusRes = await fetch(`${API_BASE}/api/video/status/${taskId}`, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!statusRes.ok) {
+      const err = await statusRes.json().catch(() => ({ error: statusRes.statusText }));
+      throw new Error(err?.error || 'Status check failed');
     }
+
+    const statusData = (await statusRes.json()) as {
+      status?: string;
+      progress?: number;
+      error?: { message?: string };
+    };
+
+    const status = statusData.status ?? '';
+    const progress = statusData.progress ?? 0;
+
+    if (status === 'completed') {
+      onProgress?.(`Done (100%).\n`);
+      const videoUrl = `${API_BASE}/api/video/result/${taskId}`;
+      return { videoUrl };
+    }
+
+    if (status === 'failed') {
+      const msg = statusData.error?.message ?? 'Generation failed';
+      throw new Error(msg);
+    }
+
+    onProgress?.(`Status: ${status}, progress: ${progress}%…\n`);
   }
 
-  const match = fullContent.match(VIDEO_URL_REGEX);
-  const videoUrl = match ? match[0] : '';
-  if (!videoUrl) {
-    throw new Error('No video URL in response. Generation may have failed.');
-  }
-
-  return { videoUrl };
+  throw new Error('Video generation timed out');
 }
