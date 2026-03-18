@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { generateVideoFromImage, SORA_VIDEO_MODELS, type SoraVideoModelId } from '../services/videoGeneration';
+import { generateVideoFromImage, VIDEO_MODELS, type VideoModelId } from '../services/videoGeneration';
 import { compressImageForReference } from '../utils/compressImage';
 
 interface VideoPageProps {
@@ -12,7 +12,7 @@ const VideoPage: React.FC<VideoPageProps> = () => {
   const state = location.state as { imageUrl?: string; prompt?: string } | null;
   const [imageUrl, setImageUrl] = useState(state?.imageUrl ?? '');
   const [prompt, setPrompt] = useState(state?.prompt ?? '');
-  const [model, setModel] = useState<SoraVideoModelId>('sora_video2');
+  const [model, setModel] = useState<VideoModelId>('veo-3.1-fl');
   const [generating, setGenerating] = useState(false);
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -90,8 +90,8 @@ const VideoPage: React.FC<VideoPageProps> = () => {
         </div>
 
         <p className="text-white/55 text-sm mb-6">
-          Create a short video from one image using Sora 2. Upload a reference photo or use one from your
-          kreations via &quot;Create video&quot; in the image modal. Videos are ~$0.15 each; link valid 1 day.
+          Create a short video from one image using Veo 3.1. Upload a reference photo or use one from your
+          kreations via &quot;Create video&quot; in the image modal. Videos are $0.15–$0.25 each; link valid 1 day.
         </p>
 
         <div className="space-y-4 mb-6">
@@ -174,13 +174,13 @@ const VideoPage: React.FC<VideoPageProps> = () => {
             <label className="block text-white/70 text-sm font-medium mb-1.5">Model</label>
             <select
               value={model}
-              onChange={(e) => setModel(e.target.value as SoraVideoModelId)}
+              onChange={(e) => setModel(e.target.value as VideoModelId)}
               className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
               disabled={generating}
             >
-              {(Object.keys(SORA_VIDEO_MODELS) as SoraVideoModelId[]).map((id) => (
+              {(Object.keys(VIDEO_MODELS) as VideoModelId[]).map((id) => (
                 <option key={id} value={id}>
-                  {SORA_VIDEO_MODELS[id]}
+                  {VIDEO_MODELS[id]}
                 </option>
               ))}
             </select>
