@@ -1,11 +1,7 @@
 /**
- * Stripe Buy Button IDs for each plan.
- * The buy-button web component passes client-reference-id={userId} so the
- * webhook knows which user to credit.
+ * Stripe Payment Links for each plan.
+ * Each button opens Stripe's hosted checkout with ?client_reference_id={userId}.
  */
-
-export const STRIPE_PUBLISHABLE_KEY =
-  'pk_live_51OCL6dIy7MDihOoSBXzhKrSEmhw7dINdMibJM95BrrQjRUSoQMneLhLeyBCbcfdVQp4BZ2BopD1d52E2MVVscnz700vM0hq7dI';
 
 export const PLANS = [
   {
@@ -14,7 +10,7 @@ export const PLANS = [
     price: 19,
     credits: 200,
     perCredit: '$0.095',
-    buyButtonId: 'buy_btn_1TGHGbIy7MDihOoSZmEDBI5U',
+    paymentLink: 'https://buy.stripe.com/4gMeVe15b8s4aicakC0oM00',
     popular: false,
   },
   {
@@ -23,7 +19,7 @@ export const PLANS = [
     price: 35,
     credits: 400,
     perCredit: '$0.0875',
-    buyButtonId: 'buy_btn_1TGHJiIy7MDihOoS2mPNG9q4',
+    paymentLink: 'https://buy.stripe.com/eVq00k6pv37K4XS3We0oM01',
     popular: true,
   },
   {
@@ -32,9 +28,14 @@ export const PLANS = [
     price: 85,
     credits: 1000,
     perCredit: '$0.085',
-    buyButtonId: 'buy_btn_1TGH6yIy7MDihOoSxgsnjCkQ',
+    paymentLink: 'https://buy.stripe.com/8x25kEbJP8s4eyseAS0oM02',
     popular: false,
   },
 ] as const;
 
 export type PlanId = (typeof PLANS)[number]['id'];
+
+export function getCheckoutUrl(paymentLink: string, userId: string): string {
+  const sep = paymentLink.includes('?') ? '&' : '?';
+  return `${paymentLink}${sep}client_reference_id=${encodeURIComponent(userId)}`;
+}

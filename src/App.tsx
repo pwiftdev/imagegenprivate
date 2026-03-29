@@ -21,6 +21,7 @@ import LandingPage from './pages/LandingPage';
 import MoodboardsPage from './pages/MoodboardsPage';
 import MyPromptsPage from './pages/MyPromptsPage';
 import VideoPage from './pages/VideoPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import { fetchPromptTemplates, DEFAULT_PROMPT_TEMPLATES } from './services/promptTemplateService';
 import './App.css';
 
@@ -1242,6 +1243,7 @@ function App() {
       <Route path="/app/moodboards" element={<AppShell />} />
       <Route path="/app/prompts" element={<AppShell />} />
       <Route path="/app/video" element={<AppShell />} />
+      <Route path="/payment/success" element={<PaymentSuccessPage />} />
     </Routes>
   );
 }
