@@ -6,6 +6,17 @@ import LandingCursorLogo from '../components/LandingCursorLogo';
 const HERO_ROTATING_WORDS = ['hassle', 'waste', 'noise', 'clutter', 'bloat'];
 const HERO_WORD_INTERVAL_MS = 1500;
 
+const INCLUDED_FEATURES = [
+  'Nano Banana 2 & Pro',
+  'Up to 4K output',
+  'Custom aspect ratios',
+  'Edit feature',
+  'Up to 3 parallel generations',
+  'Unlimited queued generations',
+  'Prompt Library',
+  'Moodboards',
+];
+
 /** Returns current scroll Y for parallax and nav; updates every frame while scrolling */
 function useParallaxScroll() {
   const [scrollY, setScrollY] = useState(0);
@@ -90,7 +101,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#08090a] text-white overflow-x-hidden landing-font-body">
       <LandingCursorLogo />
-      {/* Animated background orbs - blue palette + strong parallax on scroll */}
+      {/* Animated background orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute will-change-transform" style={{ top: '-35%', left: '-25%', transform: `translate3d(0, ${scrollY * 0.28}px, 0)` }}>
           <div className="w-[90vmax] h-[90vmax] rounded-full bg-gradient-to-br from-blue-500/15 via-indigo-500/10 to-blue-600/15 landing-animate-float landing-animate-glow" />
@@ -105,15 +116,15 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.025\'/%3E%3C/svg%3E')]" />
       </div>
 
-      {/* Announcement banner - same as app header */}
+      {/* Announcement banner */}
       <div
         className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-medium"
         style={{ height: 40 }}
       >
-        <span><span className="font-bold tracking-tight">20 free credits</span> for Nano Banana Pro when you sign up</span>
+        <span>Register now &amp; receive <span className="font-bold tracking-tight">20 FREE credits</span></span>
       </div>
 
-      {/* Nav - stronger border/backdrop on scroll */}
+      {/* Nav */}
       <nav className={`fixed left-0 right-0 z-40 flex items-center justify-between px-6 h-16 border-b bg-[#08090a]/85 backdrop-blur-xl transition-all duration-300 ${scrollY > 24 ? 'border-white/12 bg-[#08090a]/90 shadow-lg shadow-black/10' : 'border-white/[0.06]'}`} style={{ top: 40 }}>
         <Link to="/" className="flex items-center gap-2.5 group">
           <img
@@ -142,7 +153,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero - parallax: content lags behind scroll for depth */}
+      {/* Hero */}
       <section className="relative pt-40 pb-32 px-6">
         <div className="max-w-5xl mx-auto text-center relative z-10 will-change-transform" style={{ transform: `translate3d(0, ${scrollY * 0.14}px, 0)` }}>
           <p
@@ -163,7 +174,7 @@ export default function LandingPage() {
             className="mt-8 text-lg md:text-xl text-white/55 max-w-2xl mx-auto leading-relaxed landing-animate-fade-up opacity-0"
             style={{ animationDelay: '0.35s', animationFillMode: 'forwards' }}
           >
-            Pay only for what you <span className="landing-font-display font-semibold text-blue-400">Kreate</span>. No subscriptions, no credit traps, no overpaying the big players.
+            Cheapest Nano Banana on the market. Fast generations, credit roll-over, and plans that <span className="landing-font-display font-semibold text-blue-400">actually make sense</span>.
           </p>
           <div
             className="mt-14 flex flex-wrap items-center justify-center gap-4 landing-animate-fade-up opacity-0"
@@ -180,7 +191,7 @@ export default function LandingPage() {
               href="#whats-kreating"
               className="px-9 py-4 rounded-2xl border-2 border-white/15 text-white/90 font-semibold hover:border-blue-400/50 hover:text-blue-200 hover:bg-blue-500/10 transition-all duration-300"
             >
-              See what’s Kreating
+              See what's Kreating
             </a>
             <a
               href="#how-it-works"
@@ -192,15 +203,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* What's Kreating? - Showcase: 3 rows of Supabase thumbnails, marquee full viewport width */}
+      {/* What's Kreating? */}
       <section id="whats-kreating" className="relative py-28 overflow-hidden">
         <div ref={showcaseRef} className={`relative z-10 landing-scroll-reveal ${showcaseInView ? 'landing-in-view' : ''}`}>
           <div className="max-w-6xl mx-auto px-6 text-center mb-16 landing-reveal-item">
             <h2 className="landing-font-display text-3xl md:text-5xl font-bold text-white">
-              What’s <span className="landing-gradient-text">Kreating</span>?
+              What's <span className="landing-gradient-text">Kreating</span>?
             </h2>
             <p className="mt-4 text-white/55 text-lg max-w-xl mx-auto">
-              Real images from the community. One prompt, one credit, no lock-in.
+              Real images from the community. One prompt, one generation.
             </p>
           </div>
           {showcaseThumbnails.length > 0 ? (
@@ -249,85 +260,112 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing / Kredit packages */}
+      {/* Pricing */}
       <section className="relative py-28 px-6 border-t border-white/[0.06]">
         <div ref={pricingRef} className={`max-w-5xl mx-auto relative z-10 landing-scroll-reveal ${pricingInView ? 'landing-in-view' : ''}`}>
           <div className="text-center mb-4 landing-reveal-item">
             <h2 className="landing-font-display text-3xl md:text-4xl font-bold text-white">
-              Simple pricing
+              Simple, transparent pricing
             </h2>
             <p className="mt-4 text-white/55 text-lg max-w-2xl mx-auto">
-              Start with free credits. When you’re ready, buy more. No subscription required.
+              Pick a plan, get monthly generations. Unused credits roll over. Cancel anytime.
             </p>
           </div>
           <p className="text-center text-white/40 text-sm mt-2 mb-12 landing-reveal-item">
-            Same flagship-quality models you’d get from big providers. Google charges around <span className="text-white/70 font-medium">$0.16 per image</span> for comparable API usage—we’re up to half the cost.
+            Same Nano Banana models others charge a premium for. We start at <span className="text-white/70 font-medium">$0.063 per generation</span>.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 landing-reveal-item">
             {/* Starter */}
-            <div className="relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300">
+            <div className="relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 flex flex-col">
               <div className="text-center">
                 <h3 className="landing-font-display font-bold text-white text-lg">Starter</h3>
-                <p className="mt-4 text-3xl font-bold text-white">$19</p>
-                <p className="mt-1 text-white/60 text-sm">200 credits · 200 image generations</p>
-                <p className="mt-2 text-blue-400/90 text-sm font-medium">$0.095 per credit</p>
-                <Link to="/app" className="mt-6 block w-full py-3 rounded-xl border border-white/20 text-white text-sm font-medium hover:bg-white/10 transition-colors">Get started</Link>
+                <p className="text-white/40 text-xs mt-1">For first-time AI content creators</p>
+                <div className="mt-4 p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                  <p className="text-white font-bold text-sm">100 generations / mo</p>
+                  <p className="text-white/50 text-xs mt-1">$0.11 per generation</p>
+                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-500/15 text-green-400 border border-green-500/20">27% cheaper than Higgsfield</span>
+                </div>
+                <p className="mt-4 text-3xl font-bold text-white">$11<span className="text-white/50 text-base font-normal"> / month</span></p>
+                <Link to="/app" className="mt-5 block w-full py-3 rounded-xl border border-white/20 text-white text-sm font-medium hover:bg-white/10 transition-colors">Get started</Link>
               </div>
             </div>
-            {/* Kreator ⭐ */}
-            <div className="relative p-6 rounded-2xl bg-white/[0.06] border-2 border-blue-400/40 shadow-lg shadow-blue-500/15 landing-reveal-card">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-blue-500/90 text-white text-xs font-semibold">Popular</div>
+
+            {/* Kreator */}
+            <div className="relative p-6 rounded-2xl bg-white/[0.06] border-2 border-blue-400/40 shadow-lg shadow-blue-500/15 flex flex-col landing-reveal-card">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-blue-500/90 text-white text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">Most popular</div>
               <div className="text-center">
-                <h3 className="landing-font-display font-bold text-white text-lg">Kreator ⭐</h3>
-                <p className="mt-4 text-3xl font-bold text-white">$35</p>
-                <p className="mt-1 text-white/60 text-sm">400 credits · 400 image generations</p>
-                <p className="mt-2 text-blue-400/90 text-sm font-medium">$0.0875 per credit</p>
-                <Link to="/app" className="mt-6 block w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold hover:opacity-95 transition-opacity">Get started</Link>
+                <h3 className="landing-font-display font-bold text-white text-lg">Kreator</h3>
+                <p className="text-white/40 text-xs mt-1">For consistent AI content creators</p>
+                <div className="mt-4 p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/20">
+                  <p className="text-white font-bold text-sm">500 generations / mo</p>
+                  <p className="text-white/50 text-xs mt-1">$0.078 per generation</p>
+                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-500/15 text-green-400 border border-green-500/20">20% cheaper than Higgsfield</span>
+                </div>
+                <p className="mt-4 text-3xl font-bold text-white">$39<span className="text-white/50 text-base font-normal"> / month</span></p>
+                <Link to="/app" className="mt-5 block w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold hover:opacity-95 transition-opacity shadow-md shadow-blue-500/20">Get started</Link>
               </div>
             </div>
+
             {/* Agency */}
-            <div className="relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300">
+            <div className="relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 flex flex-col">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">Best value</div>
               <div className="text-center">
                 <h3 className="landing-font-display font-bold text-white text-lg">Agency</h3>
-                <p className="mt-4 text-3xl font-bold text-white">$85</p>
-                <p className="mt-1 text-white/60 text-sm">1,000 credits · 1,000 image generations</p>
-                <p className="mt-2 text-blue-400/90 text-sm font-medium">$0.085 per credit</p>
-                <Link to="/app" className="mt-6 block w-full py-3 rounded-xl border border-white/20 text-white text-sm font-medium hover:bg-white/10 transition-colors">Get started</Link>
+                <p className="text-white/40 text-xs mt-1">For studios and production teams</p>
+                <div className="mt-4 p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                  <p className="text-white font-bold text-sm">1,500 generations / mo</p>
+                  <p className="text-white/50 text-xs mt-1">$0.063 per generation</p>
+                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-green-500/15 text-green-400 border border-green-500/20">5% cheaper than Higgsfield</span>
+                </div>
+                <p className="mt-4 text-3xl font-bold text-white">$95<span className="text-white/50 text-base font-normal"> / month</span></p>
+                <Link to="/app" className="mt-5 block w-full py-3 rounded-xl border border-white/20 text-white text-sm font-medium hover:bg-white/10 transition-colors">Get started</Link>
               </div>
             </div>
           </div>
 
-          <p className="mt-8 text-center text-white/50 text-sm landing-reveal-item">
-            Need fewer than 200 credits? Top up a custom amount and pay <span className="text-white/80 font-medium">$0.099</span> per credit.
-          </p>
-          <p className="mt-2 text-center text-white/40 text-xs landing-reveal-item">
-            One credit = one generation. Flagship models, aspect ratios, reference images. Pay only for what you create.
+          {/* Everything included */}
+          <div className="mt-12 rounded-2xl bg-white/[0.03] border border-white/10 p-6 md:p-8 landing-reveal-item">
+            <p className="text-white/50 text-[10px] font-semibold uppercase tracking-wider mb-4">Everything included in all plans</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-3">
+              {INCLUDED_FEATURES.map((feature) => (
+                <div key={feature} className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-white/70 text-sm">{feature}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="mt-8 text-center text-white/40 text-xs landing-reveal-item">
+            Unused credits roll over each month. Cancel anytime &mdash; keep your remaining credits.
           </p>
           <div className="mt-10 text-center landing-reveal-item">
             <Link
               to="/app"
               className="inline-flex px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold hover:opacity-95 hover:scale-105 transition-all duration-300 shadow-lg shadow-blue-500/25"
             >
-              Get started — free credits included
+              Start with 20 free generations
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Problem */}
+      {/* Why Kreator */}
       <section className="relative py-24 px-6 border-y border-white/[0.06]">
         <div ref={problemRef} className={`max-w-3xl mx-auto text-center relative z-10 landing-scroll-reveal ${problemInView ? 'landing-in-view' : ''}`}>
           <h2 className="landing-font-display text-3xl md:text-4xl font-bold text-white landing-reveal-item">
-            Tired of subscriptions and credit loss?
+            Tired of overpaying for AI images?
           </h2>
           <p className="mt-6 text-white/50 leading-relaxed text-lg landing-reveal-item">
-            Tools like Higgsfield lock you into monthly plans. Use less and you still pay the full fee. Use more and you hit expensive top-ups. Credits expire. You end up handing money to the same industry leaders, whether you’re underusing or overusing.
+            Other tools charge premium prices for the same Nano Banana models we use. Their credits expire, their plans are rigid, and switching costs you money. Kreator gives you the same quality at a fraction of the price &mdash; with credits that roll over and plans you can cancel anytime.
           </p>
         </div>
       </section>
 
-      {/* How it works – benefits & features that matter */}
+      {/* How it works */}
       <section id="how-it-works" className="relative py-28 px-6 border-t border-white/[0.06]">
         <div ref={solutionRef} className={`max-w-5xl mx-auto relative z-10 landing-scroll-reveal ${solutionInView ? 'landing-in-view' : ''}`}>
           <div className="text-center mb-16 landing-reveal-item">
@@ -335,17 +373,25 @@ export default function LandingPage() {
               Why <span className="landing-gradient-text">Kreator</span>?
             </h2>
             <p className="mt-4 text-white/55 text-lg max-w-2xl mx-auto">
-              Pro-quality images, fair pricing, and no lock-in. Everything you need to create without the waste.
+              Pro-quality images, the lowest prices, and credits that never expire. Everything you need to create without the waste.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="group relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 landing-reveal-card">
               <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:bg-blue-500/30 transition-colors">
-                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" /></svg>
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </div>
-              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Pro-quality, not pro prices</h3>
-              <p className="text-white/50 text-sm leading-relaxed">Same flagship model the big players charge ~$0.16 per image for. You get that quality at up to half the cost—no subscription required.</p>
+              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Cheapest on the market</h3>
+              <p className="text-white/50 text-sm leading-relaxed">Same Nano Banana 2 &amp; Pro models others charge $0.15+ per image for. Our plans start at $0.063 per generation.</p>
+            </div>
+
+            <div className="group relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 landing-reveal-card">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:bg-blue-500/30 transition-colors">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              </div>
+              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Credits roll over</h3>
+              <p className="text-white/50 text-sm leading-relaxed">Didn't use all your generations this month? They carry over. No expiry, no waste. Your credits are yours until you use them.</p>
             </div>
 
             <div className="group relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 landing-reveal-card">
@@ -357,19 +403,11 @@ export default function LandingPage() {
             </div>
 
             <div className="group relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 landing-reveal-card">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:bg-blue-500/30 transition-colors">
-                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
-              </div>
-              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Any format you need</h3>
-              <p className="text-white/50 text-sm leading-relaxed">Feed, story, print, or custom. Pick the aspect ratio that fits the project—no juggling multiple tools or cropping later.</p>
-            </div>
-
-            <div className="group relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 landing-reveal-card">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-4 group-hover:bg-indigo-500/30 transition-colors">
-                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
               </div>
-              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Pay only for what you use</h3>
-              <p className="text-white/50 text-sm leading-relaxed">One credit, one image. No monthly fee, no surprise bills. Use five or five hundred—you’re in control. Start with free credits and top up when you need more.</p>
+              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Any format, up to 4K</h3>
+              <p className="text-white/50 text-sm leading-relaxed">Feed, story, print, or custom aspect ratios. Output up to 4K resolution. No juggling multiple tools or cropping later.</p>
             </div>
 
             <div className="group relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 landing-reveal-card">
@@ -377,15 +415,15 @@ export default function LandingPage() {
                 <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               </div>
               <h3 className="landing-font-display font-bold text-white text-lg mb-2">Fast, not fussy</h3>
-              <p className="text-white/50 text-sm leading-relaxed">Describe it, add refs if you want, hit Kreate. Your images show up without the usual wait—so you can iterate and ship.</p>
+              <p className="text-white/50 text-sm leading-relaxed">Up to 3 parallel generations at once with unlimited queued jobs. Describe it, hit Kreate, iterate fast.</p>
             </div>
 
             <div className="group relative p-6 rounded-2xl bg-white/[0.04] border border-white/10 hover:border-blue-400/25 transition-all duration-300 landing-reveal-card">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-4 group-hover:bg-indigo-500/30 transition-colors">
-                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" /></svg>
+                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               </div>
-              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Yours to keep</h3>
-              <p className="text-white/50 text-sm leading-relaxed">Full-resolution files in your account. Use them in client work, campaigns, or wherever you need—no watermarks, no takebacks.</p>
+              <h3 className="landing-font-display font-bold text-white text-lg mb-2">Cancel anytime</h3>
+              <p className="text-white/50 text-sm leading-relaxed">No contracts, no penalties. Cancel and keep using your remaining credits. Switch plans or come back whenever you want.</p>
             </div>
           </div>
         </div>
@@ -418,7 +456,7 @@ export default function LandingPage() {
               Built for creators who ship
             </h2>
             <p className="mt-6 text-white/55 text-lg landing-reveal-item">
-              Join agencies and freelancers who switched to pay-as-you-go. Less waste, more control.
+              Join agencies and freelancers saving up to 60% on AI image generation. Same models, lower price, credits that never expire.
             </p>
             <Link
               to="/app"

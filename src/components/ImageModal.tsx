@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom'; // hidden — video is internal beta
 
 interface ImageModalProps {
   imageUrl: string;
@@ -79,7 +79,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
   hasPrev = false,
   hasNext = false,
 }) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // hidden — video is internal beta
   const [zoom, setZoom] = useState(1);
   const [isDeleting, setIsDeleting] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -921,6 +921,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Reuse prompt
               </button>
+              {/* Create video button hidden — internal beta only
               <button
                 onClick={() => {
                   navigate('/app/video', { state: { imageUrl, prompt: (displayPrompt ?? prompt) ?? '' } });
@@ -943,6 +944,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 </svg>
                 Create video
               </button>
+              */}
               {isShareSupported && (
                 <button
                   onClick={handleShare}

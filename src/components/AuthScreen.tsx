@@ -93,7 +93,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onSignIn, onSignUp, onSignInWit
             <span className="landing-gradient-text">without the waste</span>
           </h2>
           <p className="mt-6 text-white/55 text-lg">
-            Pay only for what you use. No subscriptions, no credit traps.
+            Cheapest Nano Banana on the market. Fast generations &amp; credit roll-over.
           </p>
         </div>
       </div>

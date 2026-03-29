@@ -188,6 +188,8 @@ function AppShell() {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
@@ -223,6 +225,8 @@ function AppShell() {
     if (p) {
       setCurrentUserCreator({ username: p.username || 'Creator', avatar_url: p.avatar_url });
       setCredits(typeof p.credits === 'number' ? p.credits : 0);
+      setSubscriptionPlan(p.subscription_plan ?? null);
+      setSubscriptionStatus(p.subscription_status ?? null);
     }
   }, [user?.id, user?.email]);
 
@@ -653,7 +657,7 @@ function AppShell() {
 
   return (
     <>
-      {pathname !== '/app/profile' && pathname !== '/app/moodboards' && pathname !== '/app/prompts' && pathname !== '/app/video' && <Header onSignOut={signOut} credits={credits} userId={user?.id} />}
+      {pathname !== '/app/profile' && pathname !== '/app/moodboards' && pathname !== '/app/prompts' && pathname !== '/app/video' && <Header onSignOut={signOut} credits={credits} userId={user?.id} subscriptionPlan={subscriptionPlan} subscriptionStatus={subscriptionStatus} />}
       {pathname === '/app/profile' ? (
         <ProfilePage user={user} credits={credits} onSignOut={signOut} onRequestPasswordReset={user?.email ? async () => { await resetPassword(user.email!); } : undefined} />
       ) : pathname === '/app/moodboards' ? (
@@ -1051,6 +1055,7 @@ function AppShell() {
                 </svg>
                 My Prompts
               </Link>
+              {/* Video link hidden — internal beta only
               <Link
                 to="/app/video"
                 className="px-4 py-2 rounded-xl text-sm font-medium text-white/80 hover:text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center gap-2"
@@ -1060,6 +1065,7 @@ function AppShell() {
                 </svg>
                 Image to Video
               </Link>
+              */}
             </div>
           </div>
         </div>

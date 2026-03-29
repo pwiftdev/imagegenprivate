@@ -9,6 +9,10 @@ export interface Profile {
   username: string | null;
   avatar_url: string | null;
   credits: number;
+  stripe_customer_id: string | null;
+  subscription_plan: string | null;
+  subscription_status: string | null;
+  subscription_current_period_end: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,7 +79,7 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, credits, created_at, updated_at')
+    .select('id, username, avatar_url, credits, stripe_customer_id, subscription_plan, subscription_status, subscription_current_period_end, created_at, updated_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -104,6 +108,22 @@ export async function updateProfile(
 
   if (error) throw new Error(error.message);
   return data;
+}
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+
+export async function createPortalSession(userId: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/stripe/portal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to create portal session' }));
+    throw new Error(err.error || 'Failed to create portal session');
+  }
+  const data = (await res.json()) as { url: string };
+  return data.url;
 }
 
 export async function uploadAvatar(userId: string, file: File): Promise<string> {
