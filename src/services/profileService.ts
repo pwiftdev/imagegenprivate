@@ -48,6 +48,28 @@ export async function fetchProfilesByIds(userIds: string[]): Promise<Map<string,
   return map;
 }
 
+export interface CreditPurchase {
+  id: string;
+  credits: number;
+  amount_cents: number;
+  currency: string;
+  plan_name: string | null;
+  created_at: string;
+}
+
+export async function fetchPurchases(userId: string): Promise<CreditPurchase[]> {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from('credit_purchases')
+    .select('id, credits, amount_cents, currency, plan_name, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   if (!supabase) return null;
 

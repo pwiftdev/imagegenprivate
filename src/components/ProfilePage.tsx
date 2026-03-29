@@ -14,7 +14,8 @@ import {
   Area,
   CartesianGrid,
 } from 'recharts';
-import { fetchProfile, updateProfile, uploadAvatar } from '../services/profileService';
+import { fetchProfile, updateProfile, uploadAvatar, fetchPurchases } from '../services/profileService';
+import type { CreditPurchase } from '../services/profileService';
 import { fetchUserStats } from '../services/imageStorage';
 import type { User } from '@supabase/supabase-js';
 import type { ImageStats } from '../services/imageStorage';
@@ -26,7 +27,7 @@ interface ProfilePageProps {
   onRequestPasswordReset?: () => Promise<void>;
 }
 
-type Section = 'overview' | 'account';
+type Section = 'overview' | 'purchases' | 'account';
 
 const QUALITY_COLORS = { '1K': '#3b82f6', '2K': '#6366f1', '4K': '#8b5cf6' };
 
@@ -40,6 +41,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
   const [stats, setStats] = useState<ImageStats | null>(null);
   const [section, setSection] = useState<Section>('overview');
   const [creditsChartView, setCreditsChartView] = useState<'daily' | 'monthly'>('daily');
+  const [purchases, setPurchases] = useState<CreditPurchase[]>([]);
+  const [purchasesLoading, setPurchasesLoading] = useState(false);
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [passwordResetLoading, setPasswordResetLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +76,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
     if (!user?.id) return;
     fetchUserStats(user.id).then(setStats).catch(() => setStats(null));
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || section !== 'purchases') return;
+    setPurchasesLoading(true);
+    fetchPurchases(user.id)
+      .then(setPurchases)
+      .catch(() => setPurchases([]))
+      .finally(() => setPurchasesLoading(false));
+  }, [user?.id, section]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +151,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2a2 2 0 012 2zm0 12v-2a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'purchases',
+      label: 'Purchases',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
         </svg>
       ),
     },
@@ -494,6 +515,99 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
                   <p className="text-white/40 text-sm">No recent activity</p>
                 )}
               </section>
+            </>
+          )}
+
+          {section === 'purchases' && (
+            <>
+              <div className="mb-8">
+                <h1 className="landing-font-display text-2xl md:text-3xl font-bold text-white">Purchases</h1>
+                <p className="text-white/55 text-sm mt-1">Your credit purchase history</p>
+              </div>
+
+              {purchasesLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/20 border-t-blue-500" />
+                </div>
+              ) : purchases.length === 0 ? (
+                <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-10 text-center">
+                  <svg className="w-12 h-12 mx-auto text-white/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  <p className="text-white/50 text-sm">No purchases yet</p>
+                  <p className="text-white/30 text-xs mt-1">Buy credits to start creating</p>
+                </section>
+              ) : (
+                <>
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                      <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Total Purchases</p>
+                      <p className="text-2xl font-bold text-white">{purchases.length}</p>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                      <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Credits Bought</p>
+                      <p className="text-2xl font-bold text-white">
+                        {purchases.reduce((s, p) => s + p.credits, 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                      <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Total Spent</p>
+                      <p className="text-2xl font-bold text-white">
+                        ${(purchases.reduce((s, p) => s + p.amount_cents, 0) / 100).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/10 p-5 hover:border-blue-500/20 transition-colors">
+                      <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-1">Last Purchase</p>
+                      <p className="text-lg font-bold text-white">
+                        {new Date(purchases[0].created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                      <p className="text-white/40 text-xs mt-0.5">{purchases[0].plan_name ?? 'Credit pack'}</p>
+                    </div>
+                  </div>
+
+                  {/* Purchases table */}
+                  <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
+                    <h2 className="landing-font-display text-lg font-semibold text-white mb-4">All Purchases</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-white/50 border-b border-white/10">
+                            <th className="text-left py-3 font-medium">Date</th>
+                            <th className="text-left py-3 font-medium">Plan</th>
+                            <th className="text-right py-3 font-medium">Credits</th>
+                            <th className="text-right py-3 font-medium">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {purchases.map((p) => (
+                            <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                              <td className="py-3 text-white">
+                                {new Date(p.created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </td>
+                              <td className="py-3">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium">
+                                  {p.plan_name ?? 'Credit pack'}
+                                </span>
+                              </td>
+                              <td className="py-3 text-right text-white font-medium">+{p.credits}</td>
+                              <td className="py-3 text-right text-white/80">
+                                ${(p.amount_cents / 100).toFixed(2)} {p.currency.toUpperCase()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                </>
+              )}
             </>
           )}
 
