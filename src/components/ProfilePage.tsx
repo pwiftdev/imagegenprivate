@@ -666,46 +666,78 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
                 {/* Subscription card */}
                 <section className="rounded-2xl bg-white/[0.04] border border-white/10 p-6">
                   <h2 className="landing-font-display text-lg font-semibold text-white mb-4">Subscription</h2>
-                  {subscriptionStatus === 'active' || subscriptionStatus === 'trialing' ? (
-                    <>
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/25 text-green-300 text-xs font-semibold">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                          Active
+                  {subscriptionStatus === 'active' || subscriptionStatus === 'trialing' ? (() => {
+                    const activePlan = PLANS.find((p) => p.id === subscriptionPlan);
+                    return (
+                      <>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/25 text-green-300 text-xs font-semibold">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                            Active
+                          </div>
+                          <span className="text-white font-semibold text-lg">
+                            {activePlan?.name ?? subscriptionPlan ?? 'Plan'}
+                          </span>
                         </div>
-                        <span className="text-white font-semibold text-lg">
-                          {PLANS.find((p) => p.id === subscriptionPlan)?.name ?? subscriptionPlan ?? 'Plan'}
-                        </span>
-                      </div>
-                      {subscriptionPeriodEnd && (
-                        <p className="text-white/40 text-xs mb-3">
-                          Next billing: {new Date(subscriptionPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setPortalLoading(true);
-                          try {
-                            const url = await createPortalSession(user.id);
-                            window.location.href = url;
-                          } catch {
-                            setError('Failed to open subscription portal');
-                            setPortalLoading(false);
-                          }
-                        }}
-                        disabled={portalLoading}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-300 text-sm font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        {portalLoading ? 'Loading…' : 'Manage Subscription'}
-                      </button>
-                      <p className="text-white/30 text-xs mt-2">Change plan, update payment, or cancel</p>
-                    </>
-                  ) : subscriptionStatus === 'past_due' ? (
+
+                        {activePlan && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                            <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3">
+                              <p className="text-white/40 text-[10px] font-medium uppercase tracking-wider">Price</p>
+                              <p className="text-white font-bold text-lg mt-0.5">${activePlan.price}<span className="text-white/40 text-xs font-normal">/mo</span></p>
+                            </div>
+                            <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3">
+                              <p className="text-white/40 text-[10px] font-medium uppercase tracking-wider">Monthly generations</p>
+                              <p className="text-white font-bold text-lg mt-0.5">{activePlan.credits.toLocaleString()}</p>
+                            </div>
+                            <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3">
+                              <p className="text-white/40 text-[10px] font-medium uppercase tracking-wider">Per generation</p>
+                              <p className="text-white font-bold text-lg mt-0.5">{activePlan.perCredit}</p>
+                            </div>
+                            <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3">
+                              <p className="text-white/40 text-[10px] font-medium uppercase tracking-wider">Next billing</p>
+                              <p className="text-white font-bold text-sm mt-0.5">
+                                {subscriptionPeriodEnd
+                                  ? new Date(subscriptionPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                  : '—'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {!activePlan && subscriptionPeriodEnd && (
+                          <p className="text-white/40 text-xs mb-4">
+                            Next billing: {new Date(subscriptionPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        )}
+
+                        <p className="text-white/30 text-xs mb-4">Unused credits roll over each month. Cancel anytime and keep your remaining credits.</p>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setPortalLoading(true);
+                            try {
+                              const url = await createPortalSession(user.id);
+                              window.location.href = url;
+                            } catch {
+                              setError('Failed to open subscription portal');
+                              setPortalLoading(false);
+                            }
+                          }}
+                          disabled={portalLoading}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-300 text-sm font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          {portalLoading ? 'Loading\u2026' : 'Manage Subscription'}
+                        </button>
+                        <p className="text-white/30 text-xs mt-2">Change plan, update payment method, or cancel</p>
+                      </>
+                    );
+                  })() : subscriptionStatus === 'past_due' ? (
                     <>
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-semibold mb-3">
                         <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -727,13 +759,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, credits, onSignOut, onR
                         disabled={portalLoading}
                         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-sm font-medium hover:bg-amber-500/30 transition-colors disabled:opacity-50"
                       >
-                        {portalLoading ? 'Loading…' : 'Update Payment Method'}
+                        {portalLoading ? 'Loading\u2026' : 'Update Payment Method'}
                       </button>
                     </>
                   ) : (
                     <>
                       <p className="text-white/50 text-sm mb-1">No active subscription</p>
-                      <p className="text-white/40 text-xs">Subscribe to get monthly credits top-ups.</p>
+                      <p className="text-white/40 text-xs">Subscribe to get monthly generation top-ups. Unused credits roll over.</p>
                     </>
                   )}
                 </section>
