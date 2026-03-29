@@ -652,7 +652,7 @@ function AppShell() {
 
   return (
     <>
-      {pathname !== '/app/profile' && pathname !== '/app/moodboards' && pathname !== '/app/prompts' && pathname !== '/app/video' && <Header onSignOut={signOut} credits={credits} />}
+      {pathname !== '/app/profile' && pathname !== '/app/moodboards' && pathname !== '/app/prompts' && pathname !== '/app/video' && <Header onSignOut={signOut} credits={credits} userId={user?.id} />}
       {pathname === '/app/profile' ? (
         <ProfilePage user={user} credits={credits} onSignOut={signOut} onRequestPasswordReset={user?.email ? async () => { await resetPassword(user.email!); } : undefined} />
       ) : pathname === '/app/moodboards' ? (
