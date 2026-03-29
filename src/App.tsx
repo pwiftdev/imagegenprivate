@@ -408,13 +408,15 @@ function AppShell() {
     );
 
     jobsToStart.forEach((job) => {
-      const refUrls = job.params.referenceImageUrls?.filter((u): u is string => !!u);
+      const localRefUrls = job.params.referenceImageUrls?.filter((u): u is string => !!u);
       const modelLabel = job.params.model ? IMAGE_MODELS[job.params.model] : undefined;
 
       generateImage(job.params)
         .then(async (img) => {
           let gridImage: GridItem;
           const backendSaved = img.storagePath && typeof img.id === 'string' && /^[0-9a-f-]{36}$/i.test(img.id);
+          // Prefer server-persisted URLs (includes uploaded local refs), fall back to local params
+          const refUrls = img.referenceImageUrls?.length ? img.referenceImageUrls : localRefUrls;
         if (backendSaved) {
           gridImage = {
             type: 'image',

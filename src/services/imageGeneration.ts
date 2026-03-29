@@ -37,6 +37,7 @@ export interface GeneratedImage {
   prompt: string;
   aspectRatio: string;
   imageSize: string;
+  referenceImageUrls?: string[];
 }
 
 const MAX_RETRIES = 3;
