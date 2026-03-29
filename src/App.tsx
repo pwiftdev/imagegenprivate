@@ -668,7 +668,7 @@ function AppShell() {
       ) : pathname === '/app/prompts' ? (
         <MyPromptsPage user={user} onSignOut={signOut} />
       ) : pathname === '/app/video' ? (
-        <VideoPage />
+        <VideoPage userId={user?.id} credits={credits} onCreditsChange={setCredits} />
       ) : (
     <div className="min-h-screen bg-[#08090a] pb-32 pt-16 landing-font-body relative">
       {/* Background – same vibe as landing (orbs + gradient + noise) */}

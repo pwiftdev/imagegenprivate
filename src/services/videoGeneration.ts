@@ -15,10 +15,18 @@ export const VIDEO_MODELS = {
 
 export type VideoModelId = keyof typeof VIDEO_MODELS;
 
+export const VIDEO_CREDIT_COST: Record<VideoModelId, number> = {
+  'veo-3.1-fl': 25,
+  'veo-3.1-fast-fl': 20,
+  'veo-3.1-landscape-fl': 25,
+  'veo-3.1-landscape-fast-fl': 20,
+};
+
 export interface GenerateVideoParams {
   prompt: string;
   imageUrl: string;
   model?: VideoModelId;
+  userId?: string;
 }
 
 export interface GenerateVideoResult {
@@ -32,7 +40,7 @@ export async function generateVideoFromImage(
   params: GenerateVideoParams,
   onProgress?: (text: string) => void
 ): Promise<GenerateVideoResult> {
-  const { prompt, imageUrl, model = 'veo-3.1-fl' } = params;
+  const { prompt, imageUrl, model = 'veo-3.1-fl', userId } = params;
 
   if (!API_BASE) throw new Error('VITE_API_BASE_URL is not set');
 
@@ -40,7 +48,7 @@ export async function generateVideoFromImage(
   const createRes = await fetch(`${API_BASE}/api/video/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, imageUrl, model }),
+    body: JSON.stringify({ prompt, imageUrl, model, userId }),
   });
 
   if (!createRes.ok) {

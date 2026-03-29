@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { generateVideoFromImage, VIDEO_MODELS, type VideoModelId } from '../services/videoGeneration';
+import { generateVideoFromImage, VIDEO_MODELS, VIDEO_CREDIT_COST, type VideoModelId } from '../services/videoGeneration';
 import { compressImageForReference } from '../utils/compressImage';
 
 interface VideoPageProps {
-  onSignOut?: () => void;
+  userId?: string;
+  credits?: number | null;
+  onCreditsChange?: (c: number) => void;
 }
 
-const VideoPage: React.FC<VideoPageProps> = () => {
+const VideoPage: React.FC<VideoPageProps> = ({ userId, credits, onCreditsChange }) => {
   const location = useLocation();
   const state = location.state as { imageUrl?: string; prompt?: string } | null;
   const [imageUrl, setImageUrl] = useState(state?.imageUrl ?? '');
@@ -41,6 +43,9 @@ const VideoPage: React.FC<VideoPageProps> = () => {
     }
   };
 
+  const currentCost = VIDEO_CREDIT_COST[model];
+  const canGenerate = imageUrl.trim() && prompt.trim() && !generating && (typeof credits === 'number' ? credits >= currentCost : true);
+
   const handleGenerate = async () => {
     const url = imageUrl.trim();
     const text = prompt.trim();
@@ -52,6 +57,10 @@ const VideoPage: React.FC<VideoPageProps> = () => {
       setError('Reference must be an uploaded image or a valid https URL.');
       return;
     }
+    if (typeof credits === 'number' && credits < currentCost) {
+      setError(`You need at least ${currentCost} credits. You have ${credits}.`);
+      return;
+    }
 
     setError(null);
     setVideoUrl(null);
@@ -60,12 +69,15 @@ const VideoPage: React.FC<VideoPageProps> = () => {
 
     try {
       const result = await generateVideoFromImage(
-        { prompt: text, imageUrl: url, model },
+        { prompt: text, imageUrl: url, model, userId },
         (chunk) => {
           setProgressLog((prev) => [...prev, chunk]);
         }
       );
       setVideoUrl(result.videoUrl);
+      if (typeof credits === 'number' && onCreditsChange) {
+        onCreditsChange(credits - currentCost);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Video generation failed');
     } finally {
@@ -74,162 +86,292 @@ const VideoPage: React.FC<VideoPageProps> = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#08090a] text-white landing-font-body">
-      <div className="max-w-2xl mx-auto px-6 py-12">
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            to="/app"
-            className="flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </Link>
-          <h1 className="landing-font-display text-2xl font-bold text-white">Image to Video</h1>
+    <div className="min-h-screen bg-[#08090a] text-white landing-font-body relative">
+      {/* Background orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div className="absolute" style={{ top: '-30%', right: '-20%' }}>
+          <div className="w-[70vmax] h-[70vmax] rounded-full bg-gradient-to-br from-violet-500/8 via-indigo-500/6 to-purple-600/8 blur-3xl" />
+        </div>
+        <div className="absolute" style={{ bottom: '-20%', left: '-15%' }}>
+          <div className="w-[50vmax] h-[50vmax] rounded-full bg-gradient-to-tr from-blue-500/6 via-cyan-500/4 to-indigo-500/6 blur-3xl" />
+        </div>
+      </div>
+
+      <div className="relative z-10 max-w-3xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/app"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-white/60 hover:text-white hover:bg-white/5 text-sm font-medium transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </Link>
+            <div className="flex items-center gap-3">
+              <h1 className="landing-font-display text-2xl font-bold text-white">Image to Video</h1>
+              <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                Beta
+              </span>
+            </div>
+          </div>
+          {typeof credits === 'number' && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70 text-xs font-medium">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {credits} credits
+            </div>
+          )}
         </div>
 
-        <p className="text-white/55 text-sm mb-6">
-          Create a short video from one image using Veo 3.1. Upload a reference photo or use one from your
-          kreations via &quot;Create video&quot; in the image modal. Videos are $0.15–$0.25 each; link valid 1 day.
-        </p>
+        {/* Beta + download warning banner */}
+        <div className="mb-8 rounded-2xl bg-gradient-to-r from-amber-500/[0.06] to-orange-500/[0.04] border border-amber-500/20 p-5">
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-amber-200 text-sm font-semibold mb-1">Beta Feature — Download Required</p>
+              <p className="text-white/50 text-xs leading-relaxed">
+                Video generation is in beta. Generated videos are <strong className="text-white/70">not saved on Kreator servers</strong> — please download your video immediately after generation. Standard models cost <strong className="text-white/70">25 credits</strong>, fast models cost <strong className="text-white/70">20 credits</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
 
-        <div className="space-y-4 mb-6">
-          <div>
-            <label className="block text-white/70 text-sm font-medium mb-1.5">Reference photo</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-              disabled={generating || uploading}
-            />
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
+        {/* Main card */}
+        <div className="rounded-2xl bg-white/[0.03] border border-white/10 overflow-hidden">
+          <div className="p-6 md:p-8 space-y-6">
+            {/* Reference photo */}
+            <div>
+              <label className="block text-white/80 text-sm font-semibold mb-2">Reference photo</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
                 disabled={generating || uploading}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 transition-colors text-sm font-medium disabled:opacity-50"
-              >
-                {uploading ? (
-                  <>
-                    <span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                    Processing…
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Upload reference photo
-                  </>
-                )}
-              </button>
-              {imageUrl && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={imageUrl.startsWith('data:') || imageUrl.startsWith('http') ? imageUrl : ''}
-                      alt="Reference"
-                      className="w-14 h-14 rounded-lg object-cover border border-white/10 bg-white/5"
-                    />
-                    <span className="text-white/50 text-xs">
-                      {imageUrl.startsWith('data:') ? 'Uploaded' : 'From URL'}
-                    </span>
+              />
+
+              {!imageUrl ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={generating || uploading}
+                  className="w-full py-10 rounded-xl border-2 border-dashed border-white/15 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/25 transition-all flex flex-col items-center gap-3 group disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <span className="animate-spin inline-block w-6 h-6 border-2 border-white/30 border-t-blue-400 rounded-full" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-blue-500/10 group-hover:border-blue-500/20 transition-all">
+                      <svg className="w-6 h-6 text-white/40 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <p className="text-white/70 text-sm font-medium">{uploading ? 'Processing…' : 'Click to upload a reference photo'}</p>
+                    <p className="text-white/40 text-xs mt-0.5">Or paste an image URL below</p>
                   </div>
+                </button>
+              ) : (
+                <div className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                  <img
+                    src={imageUrl.startsWith('data:') || imageUrl.startsWith('http') ? imageUrl : ''}
+                    alt="Reference"
+                    className="w-20 h-20 rounded-lg object-cover border border-white/10 bg-white/5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/80 text-sm font-medium">
+                      {imageUrl.startsWith('data:') ? 'Uploaded image' : 'Image from URL'}
+                    </p>
+                    <p className="text-white/40 text-xs mt-0.5 truncate">Ready for video generation</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={generating}
+                      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 text-xs font-medium transition-all"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl('')}
+                      disabled={generating}
+                      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-red-300 hover:bg-red-500/10 hover:border-red-500/20 text-xs font-medium transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3">
+                <input
+                  type="url"
+                  value={imageUrl.startsWith('http') ? imageUrl : ''}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="Or paste image URL: https://..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+                  disabled={generating}
+                />
+              </div>
+            </div>
+
+            {/* Prompt */}
+            <div>
+              <label className="block text-white/80 text-sm font-semibold mb-2">Prompt</label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe the motion — e.g. 'The character turns and smiles at the camera, wind blowing through their hair'"
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 resize-none transition-all"
+                disabled={generating}
+              />
+            </div>
+
+            {/* Model */}
+            <div>
+              <label className="block text-white/80 text-sm font-semibold mb-2">Model</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(VIDEO_MODELS) as VideoModelId[]).map((id) => (
                   <button
+                    key={id}
                     type="button"
-                    onClick={() => setImageUrl('')}
+                    onClick={() => setModel(id)}
                     disabled={generating}
-                    className="text-white/50 hover:text-white text-xs font-medium"
+                    className={`px-4 py-3 rounded-xl text-sm font-medium text-left transition-all ${
+                      model === id
+                        ? 'bg-blue-500/15 border-2 border-blue-500/40 text-blue-200'
+                        : 'bg-white/[0.03] border border-white/10 text-white/60 hover:bg-white/[0.06] hover:text-white/80'
+                    }`}
                   >
-                    Clear
+                    <span>{VIDEO_MODELS[id]}</span>
+                    <span className={`block text-xs mt-0.5 ${model === id ? 'text-blue-400/70' : 'text-white/35'}`}>
+                      {VIDEO_CREDIT_COST[id]} credits
+                    </span>
                   </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Generate button */}
+          <div className="px-6 md:px-8 pb-6 md:pb-8">
+            {error && (
+              <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-3 text-red-300 text-sm flex items-start gap-2">
+                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {error}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!canGenerate}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold hover:from-blue-600 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 flex items-center justify-center gap-3"
+            >
+              {generating ? (
+                <>
+                  <span className="animate-spin inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
+                  Generating… (2–5 min)
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Generate video — {currentCost} credits
                 </>
               )}
-            </div>
-            <p className="text-white/45 text-xs mt-1.5">Or paste image URL below</p>
-            <input
-              type="url"
-              value={imageUrl.startsWith('http') ? imageUrl : ''}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="mt-1.5 w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-              disabled={generating}
-            />
-          </div>
-          <div>
-            <label className="block text-white/70 text-sm font-medium mb-1.5">Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g. Make this character jump off the desk and come to life"
-              rows={3}
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 resize-none"
-              disabled={generating}
-            />
-          </div>
-          <div>
-            <label className="block text-white/70 text-sm font-medium mb-1.5">Model</label>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value as VideoModelId)}
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-              disabled={generating}
-            >
-              {(Object.keys(VIDEO_MODELS) as VideoModelId[]).map((id) => (
-                <option key={id} value={id}>
-                  {VIDEO_MODELS[id]}
-                </option>
-              ))}
-            </select>
+            </button>
+
+            {typeof credits === 'number' && credits < currentCost && !generating && (
+              <p className="text-center text-red-400/80 text-xs mt-2">
+                You need {currentCost} credits for this model. You have {credits}.
+              </p>
+            )}
           </div>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-xl bg-red-500/15 border border-red-500/30 px-4 py-3 text-red-300 text-sm">
-            {error}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={generating || !imageUrl.trim() || !prompt.trim()}
-          className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-        >
-          {generating ? 'Generating… (2–5 min)' : 'Generate video'}
-        </button>
-
+        {/* Progress log */}
         {progressLog.length > 0 && (
-          <div className="mt-8 rounded-xl bg-white/5 border border-white/10 p-4 max-h-48 overflow-y-auto">
-            <p className="text-white/50 text-xs font-medium uppercase tracking-wider mb-2">Progress</p>
-            <pre className="text-white/80 text-xs whitespace-pre-wrap font-sans">
-              {progressLog.join('')}
-            </pre>
-            <div ref={logEndRef} />
+          <div className="mt-6 rounded-2xl bg-white/[0.03] border border-white/10 p-5 overflow-hidden">
+            <div className="flex items-center gap-2 mb-3">
+              {generating && (
+                <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white/20 border-t-blue-400 rounded-full" />
+              )}
+              <p className="text-white/50 text-xs font-semibold uppercase tracking-wider">Progress</p>
+            </div>
+            <div className="max-h-40 overflow-y-auto rounded-lg bg-black/30 p-3">
+              <pre className="text-white/70 text-xs whitespace-pre-wrap font-mono leading-relaxed">
+                {progressLog.join('')}
+              </pre>
+              <div ref={logEndRef} />
+            </div>
           </div>
         )}
 
+        {/* Video result */}
         {videoUrl && (
-          <div className="mt-8 rounded-xl bg-white/5 border border-white/10 p-6">
-            <p className="text-white/70 text-sm font-medium mb-3">Your video (download within 1 day)</p>
-            <video
-              src={videoUrl}
-              controls
-              className="w-full rounded-lg bg-black/40 border border-white/10"
-              playsInline
-            />
-            <a
-              href={videoUrl}
-              download="kreator-video.mp4"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-200 text-sm font-medium hover:bg-blue-500/30 transition-colors"
-            >
-              Download MP4
-            </a>
+          <div className="mt-6 rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/10 overflow-hidden">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <p className="text-white text-sm font-semibold">Video generated successfully</p>
+              </div>
+              <span className="text-amber-300/80 text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20">
+                Download now — not saved on server
+              </span>
+            </div>
+
+            <div className="p-5">
+              <video
+                src={videoUrl}
+                controls
+                className="w-full rounded-xl bg-black/60 border border-white/10"
+                playsInline
+              />
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a
+                  href={videoUrl}
+                  download="kreator-video.mp4"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-[200px] flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/20"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download MP4
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVideoUrl(null);
+                    setProgressLog([]);
+                    setImageUrl('');
+                    setPrompt('');
+                    setError(null);
+                  }}
+                  className="px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-white/70 text-sm font-medium hover:bg-white/10 hover:text-white transition-all"
+                >
+                  Generate another
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
