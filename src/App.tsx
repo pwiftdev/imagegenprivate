@@ -477,7 +477,11 @@ function AppShell() {
           void refetchCredits();
         })
         .catch((err) => {
-          setError(err instanceof Error ? err.message : 'Failed to generate image');
+          const rawMsg = err instanceof Error ? err.message : 'Failed to generate image';
+          const creditsRefunded = rawMsg.includes('[CREDITS_REFUNDED]');
+          const cleanMsg = rawMsg.replace(' [CREDITS_REFUNDED]', '');
+          setError(creditsRefunded ? `${cleanMsg} — your credit has been refunded.` : cleanMsg);
+          if (creditsRefunded) void refetchCredits();
           setGridItems((prev) => prev.filter((p) => !(p.type === 'placeholder' && p.id === job.id)));
         })
         .finally(() => {
